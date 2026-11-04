@@ -1,0 +1,78 @@
+purpose:
+  stands_in_for: Telegram Bot API ning rasm, xabar, callback va polling metodlari
+  unblocks: Haqiqiy token va foydalanuvchilarsiz Dispatcher, HTTP va SQLite oqimlarini tekshirish
+assumptions:
+  - id: registration-quota-suggestions-20261103
+    status: supported
+    claim: In local tests against the repository-owned Telegram stand-in, a verified user can request a link allowance and the admin can approve it; an approved text suggestion adds one credit only once.
+    reason: Dispatcher, SQLite and HTTP calls ran locally; no real Telegram accounts were contacted. Counts 1, 10 and 30 were exercised with the local HTTP harness, while the Postman integration exercised one credit and suggestion approval.
+    verification: Full simulation suite passed 113 tests; a subsequent focused run passed 20 tests after adding the Postman suggestion scenario. Real Telegram delivery and production migration remain unverified.
+    source: tests/test_sender_permissions.py; tests/test_postman.py::test_minimal_video_invitation_through_postman; postman/mocks/telegram/default.js
+    updated_at: '2026-11-03'
+  - id: one-link-sender-permissions-20261103
+    status: supported
+    claim: In local Dispatcher and HTTP simulation, a prior receiver can accept a new invitation, request sender permission, publish one link after admin approval, and receive again. Plain start now offers sender consent; historical global silence after completion is superseded.
+    reason: Per-invitation acceptance and transactional one-link permissions exercised against real SQLite and the existing repository-owned Telegram mock. Request and decision delivery use persistent state.
+    verification: 97 passed in 39.40s. Twelve dedicated tests cover consent, admin authorization, stale decisions, consumed grants, phone replay, draft preservation, migration, blocked users and recovery after delivery failure. Postman logs recorded 69 sendMessage calls, with explicit 500/403 scenarios; the integrated flow checks returning receiver and one-link sender behavior. Real Telegram client interaction remains unverified for this change.
+    source: tests/test_sender_permissions.py; tests/test_minimal.py; tests/test_postman.py::test_minimal_video_invitation_through_postman; TEST_REPORT.md
+    updated_at: '2026-11-03'
+  - id: sender-acceptance-notice-20261103
+    status: supported
+    claim: With the local Telegram mock, acceptance sends the selected sender a notice with the frozen No-attempt count; repeated acceptance does not send another after success. HTTP 500 leaves a persistent pending notice which a recreated App worker delivers; HTTP 403 marks failed while acceptance succeeds.
+    reason: Real aiogram HTTP calls, authenticated aiohttp accept requests and SQLite were exercised against the existing repository-owned Postman mock extended with one-shot failure injection.
+    verification: 83 tests passed in 33.56s with POSTMAN_TEST_URL on port 4629. Postman call records and request logs include the sender notice, success and injected errors. Browser tests at 280/390/1280px preserve 11 attempts through reload and submit 11 on both failed and retried acceptance. Two additional tests verify selected non-admin sender routing and schema migration. Live recipient delivery has not been exercised for this feature.
+    source: tests/test_minimal.py; tests/test_postman.py::test_minimal_video_invitation_through_postman; tests/ui_minimal.cjs; https://core.telegram.org/bots/api#sendmessage
+    updated_at: '2026-11-03'
+  - id: sender-notice-exactly-once-limit
+    status: unknown
+    claim: Retrying sendMessage after an ambiguous network timeout cannot duplicate a delivered notification.
+    reason: No provider idempotency key is used. Local locking and a persistent sent flag prevent ordinary duplicate accepts; they cannot establish exactly-once delivery across a process crash or an ambiguous upstream timeout.
+    verification: Success, explicit HTTP 500 and explicit HTTP 403 were exercised. Timeout after provider delivery was not tested; no exactly-once guarantee is claimed.
+    source: main.py App.notify_acceptance; API_CONTRACT.md; https://core.telegram.org/bots/api#sendmessage
+    updated_at: '2026-11-03'
+  - id: minimal-invitation-20261103
+    status: supported
+    claim: Active main starts only the minimal bot. Selected sender can confirm a <=60s video invitation; receiver Ha persists completion without sessions and subsequent receiver messages produce no Bot API calls.
+    reason: Real aiogram Dispatcher, aiohttp and SQLite exercised against the local Postman HTTP mock; no live Telegram credentials.
+    verification: 64 passed in 25.28s, including minimal video flow and startup/polling. After completion serialization and undelivered link recovery changes, 14 minimal tests passed again in 5.17s. Browser fixture tests pass at 280/390/1280px, including video playback and mute toggle.
+    source: tests/test_minimal.py; tests/test_postman.py::test_minimal_video_invitation_through_postman; tests/ui_minimal.cjs; TEST_REPORT.md
+    updated_at: '2026-11-03'
+  - id: minimal-live-acceptance
+    status: unknown
+    claim: New flow opens and closes correctly in an actual Telegram client through ngrok.
+    reason: 2026-11-03 live deployment verified HTTPS health=200, new page/script=200, unauthenticated API=401 and Telegram commands=[start]. Actual receiver contact/video/close interaction remains pending; absence of ngrok token is resolved.
+    source: README.md; TEST_REPORT.md
+    updated_at: '2026-11-03'
+  - id: full-startup-menu-and-health
+    status: supported
+    claim: Lokal Telegram simulyatori bilan main() Mini App serverini ochadi, HTTPS menyuni sozlaydi, polling boshlaydi va bekor qilinganda web serverni yopadi.
+    reason: Haqiqiy main(), aiohttp server va Postman Bot API mocki ishga tushirildi; ngrok tunneli bu testning tashqi bog'liqligi emas.
+    verification: 2026-11-02, 49 passed in 20.94s, exit 0. setChatMenuButton, setMyCommands, deleteWebhook va getUpdates logda kuzatildi. GET /healthz 200, GET / 200, autentifikatsiyasiz /api/me 401; shutdown dan keyin port yopiq. Ngrok 3.39.13 o'rnatildi, lekin jonli tunnel NGROK_AUTHTOKEN yo'qligi sabab hali ishga tushmagan.
+    source: tests/test_postman.py::test_full_main_starts_webapp_menu_and_polling; tests/test_launch.py; TEST_REPORT.md; postman/mocks/telegram/default.js
+    updated_at: '2026-11-02'
+  - id: mini-app-local-regression-20261102
+    status: supported
+    claim: Lokal HTTP simulyatorlari bilan joriy bot va Mini Appning 40 ta regressiya testi o'tadi; rasm preview suhbat ochmaydi, Ha idempotent.
+    reason: Postman polling testi va aiohttp orqali Mini App API testlari haqiqiy Dispatcher hamda vaqtinchalik SQLite ustida bajarildi; bu jonli Telegram kafolati emas.
+    verification: 2026-11-02 da 40 passed in 19.96s, exit 0. Postman request loglarida getUpdates, sendPhoto, copyMessage va 403/500 bor. Birinchi yurishdagi eski preview testi PRODUCT.md va DESIGN.md talabiga moslandi; begona hisobga 404 va Ha oldidan sessiya yo'qligi tekshirildi. WEBAPP_URL sozlanmagan; jonli Mini App va browser interaksiyalari tekshirilmadi.
+    source: tests/test_webapp.py; tests/test_postman.py; tests/conftest.py; TEST_REPORT.md; PRODUCT.md; DESIGN.md
+    updated_at: '2026-11-02'
+  - id: bot-api-response-shapes
+    status: supported
+    claim: sendPhoto Message, copyMessage esa MessageId qaytaradi; bot shu shakllarni qabul qiladi.
+    reason: Rasmiy aiogram 3.22.0 metod shartnomasi bilan mos; lokal HTTP testi shakllarni deserializatsiya qildi.
+    verification: 2026-11-02 da 22 test, jumladan Postman polling va foto-relay testi o'tdi. Shu kuni auditda 4618-port orqali qayta bajarildi — 22 passed in 11.06s; request loglarda getUpdates, sendPhoto va copyMessage bor. Keyingi jonli sinovda haqiqiy rasm yetkazilgani bazada kuzatildi (AUDIT_REPORT.md). Auditdagi uchta kamchilik tuzatildi; 11 yangi test bilan oxirgi natija 33 passed in 16.41s. tests/test_recovery.py da qayta tiklanish va yangi sender/receiver oqimi tekshirildi.
+    source: https://core.telegram.org/bots/api#copymessage; https://docs.aiogram.dev/en/v3.22.0/api/methods/copy_message.html; tests/test_postman.py; tests/conftest.py
+    updated_at: '2026-11-02'
+  - id: live-multi-user-flow
+    status: unknown
+    claim: Haqiqiy Telegram hisoblari bilan moderatsiya, rozilik va relay oqimi yakunlanadi.
+    reason: Jonli rasm-havola-rozilik-sessiya oqimi bazada kuzatildi; to'liq relay, admin so'rovi va blok/shikoyat qabul sinovi hali tasdiqlanmagan.
+    verification: 2026-11-02 18:32 dan keyin 2 user, 1 used link, 1 delivered photo, 1 open session va 2 yetkazilgan notice kuzatildi. Yangilangan bot ishlamoqda. Barcha 33 lokal test o'tdi; jonli ko'p hisobli sinovning qolgan qismi hali tasdiqlanmagan.
+    source: TEST_REPORT.md; README.md
+    updated_at: '2026-11-02'
+fingerprints:
+  - id: local-release-1
+    date: '2026-11-02'
+    commit: null
+    cli: '1.73.0'

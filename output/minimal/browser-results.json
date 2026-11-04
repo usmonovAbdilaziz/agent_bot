@@ -1,0 +1,6 @@
+[
+  "video: decoded browser video fixture, circular rendering, mute/unmute PASS",
+  "mobile: layout, 10 attempts, sticker, continued movement, failed accept retry, fireworks/close, photo preview PASS",
+  "desktop: layout, 10 attempts, sticker, continued movement, failed accept retry, fireworks/close, photo preview PASS",
+  "small: layout, 10 attempts, sticker, continued movement, failed accept retry, fireworks/close, photo preview PASS"
+]

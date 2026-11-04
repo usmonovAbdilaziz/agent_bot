@@ -1,0 +1,10 @@
+**
+!requirements.txt
+!config.py
+!db.py
+!invitation_store.py
+!main.py
+!webapp.py
+!web_common.py
+!web_minimal/
+!web_minimal/**

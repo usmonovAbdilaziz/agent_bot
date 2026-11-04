@@ -1,0 +1,11 @@
+.env
+.venv/
+data/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.zip
+*.ndjson
+backups/
+.runtime/
+node_modules/

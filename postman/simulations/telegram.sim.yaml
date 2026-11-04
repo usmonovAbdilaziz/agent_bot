@@ -1,0 +1,8 @@
+simulation: telegram-local
+routing: path
+mocks:
+  - name: telegram
+    routeKey: telegram
+    origin:
+      - api.telegram.org
+    path: postman/mocks/telegram/config.yaml

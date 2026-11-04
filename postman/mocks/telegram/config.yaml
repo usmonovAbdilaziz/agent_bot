@@ -1,0 +1,11 @@
+version: 1
+name: telegram
+slug: telegram
+protocol: http
+port: 4617
+origin: api.telegram.org
+interceptRequests: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

@@ -1,0 +1,43 @@
+from dataclasses import dataclass
+from pathlib import Path
+from urllib.parse import urlsplit
+import os
+import re
+from dotenv import load_dotenv
+ROOT = Path(__file__).resolve().parent
+
+@dataclass
+class Config:
+    token: str
+    admin_phone: str
+    moderation: bool = True
+    ttl: float = 48 * 3600
+    idle: float = 24 * 3600
+    db_path: str = str(ROOT / 'data/bot.sqlite3')
+    webapp_url: str = ''
+    webapp_port: int = 8080
+
+    @classmethod
+    def load(cls):
+        load_dotenv(ROOT / '.env')
+        token = os.getenv('BOT_TOKEN','').strip()
+        phone = re.sub(r'\D','',os.getenv('ADMIN_PHONE',''))
+        if not token or not phone:
+            raise ValueError(".env faylida BOT_TOKEN va ADMIN_PHONE ni to'ldiring.")
+        mode = os.getenv('MODERATION','on').lower()
+        if mode not in ('on','off'):
+            raise ValueError('MODERATION on yoki off bo‘lishi kerak.')
+        ttl = float(os.getenv('LINK_TTL_HOURS','48')) * 3600
+        idle = float(os.getenv('SESSION_IDLE_HOURS','24')) * 3600
+        if ttl <= 0 or idle <= 0:
+            raise ValueError('Muddatlar musbat son bo‘lishi kerak.')
+        path = Path(os.getenv('DB_PATH','data/bot.sqlite3'))
+        webapp_url = os.getenv('WEBAPP_URL','').strip().rstrip('/')
+        if webapp_url:
+            parsed = urlsplit(webapp_url)
+            if parsed.scheme != 'https' or not parsed.netloc or parsed.query or parsed.fragment or parsed.username:
+                raise ValueError('WEBAPP_URL ochiq HTTPS manzil bo‘lishi kerak, query va fragment qo‘shmang.')
+        port = int(os.getenv('WEBAPP_PORT','8080'))
+        if not 1 <= port <= 65535:
+            raise ValueError('WEBAPP_PORT 1–65535 oralig‘ida bo‘lsin.')
+        return cls(token,phone,mode=='on',ttl,idle,str(path if path.is_absolute() else ROOT/path),webapp_url,port)
