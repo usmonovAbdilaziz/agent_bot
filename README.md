@@ -173,3 +173,4 @@ ZIP uchun `python3 package.py`; tokenlar, baza va virtual muhit paketga kirmaydi
 Windows ZIP: `python3 package.py --windows`. Boshqa kompyuterda ayni bot tokeni
 ishlayotgan bo‘lsa, Windows nusxasini ochishdan oldin uni to‘xtating.
 # agent_bot
+# agent_bot
