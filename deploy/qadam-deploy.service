@@ -1,0 +1,10 @@
+[Unit]
+Description=Deploy verified Qadam main commit
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/ubuntu/apps/agent_bot/deployer.py
+TimeoutStartSec=15min
