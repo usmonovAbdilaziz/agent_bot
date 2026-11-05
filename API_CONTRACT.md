@@ -41,7 +41,9 @@ between now-3600s and now+30s. All responses are no-store; tokens/file IDs are p
 GET /api/invites/{id}: sender preview or assigned receiver only; returns id, title,
 description, media_kind (none/photo/video/video_note), status, preview; other users 404.
 The response also contains design: classic, romantic, playful or elegant. Existing
-invitations default to classic. Sender selects it from the bot's draft preview.
+invitations default to classic; legacy unknown designs are returned as classic. Sender selects it from the bot's draft preview.
+The response also includes type (currently fun) and details (a JSON object, default {}).
+Publishing and design selection reject designs that do not belong to the invitation type.
 GET /api/invites/{id}/media: same permission, bounded Telegram download proxied as
 JPEG or MP4. No media =>404; upstream failure =>502. Browser uses authenticated fetch
 and blob URL (no token-bearing remote URL). Video remains <=20 MiB for getFile.

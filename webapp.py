@@ -1,9 +1,11 @@
 """Receiver-only Mini App API. Acceptance never starts a relay session."""
 import io
+import json
 import time
 import asyncio
 from collections import OrderedDict
 from aiohttp import web
+from designs import valid_design
 from web_common import BOT_APP, STATIC, ApiProblem, protect, page, healthz
 
 MAX_MEDIA=20*1024*1024
@@ -60,7 +62,10 @@ async def invite_for(request):
 
 async def detail(request):
     item=await invite_for(request)
-    return web.json_response({k:item[k] for k in ('id','title','description','media_kind','status','design')} | {
+    design = item['design'] if valid_design(item['design'], item['type']) else 'classic'
+    return web.json_response({k:item[k] for k in ('id','title','description','media_kind','status')} | {
+        'design':design,
+        'type':item['type'], 'details':json.loads(item['details']),
         'preview':request['uid']==item['sender']})
 
 class BoundedBuffer(io.BytesIO):

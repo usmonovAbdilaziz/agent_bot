@@ -14,6 +14,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.exceptions import TelegramAPIError, TelegramForbiddenError, TelegramRetryAfter
 from aiogram.types import (BotCommand, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup,
     KeyboardButton, Message, ReplyKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo, MenuButtonCommands)
+from designs import DESIGNS, valid_design
 from config import Config
 from invitation_store import InvitationDB
 
@@ -285,8 +286,7 @@ class App:
         rows.append([InlineKeyboardButton(text='🎨 Dizaynni tanlash',callback_data=f'q:design:{item["id"]}')])
         rows.append([InlineKeyboardButton(text='Tasdiqlash',callback_data=f'q:confirm:{item["id"]}'),
                      InlineKeyboardButton(text='Tahrirlash',callback_data=f'q:edit:{item["id"]}')])
-        designs={'classic':'Sodda','romantic':'Romantik','playful':'Quvnoq','elegant':'Nafis'}
-        await self.send(uid,f'<b>{esc(item["title"])}</b>\n\n{esc(item["description"])}\n\nHa  /  Yo‘q\n\nDizayn: {designs.get(item["design"],"Sodda")}',
+        await self.send(uid,f'<b>{esc(item["title"])}</b>\n\n{esc(item["description"])}\n\nHa  /  Yo‘q\n\nDizayn: {DESIGNS.get(item["design"], DESIGNS["classic"])["label_uz"]}',
             reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
 
     async def show_link(self, uid, item):
@@ -459,11 +459,11 @@ class App:
         if action=='new':
             await self.db.begin(uid)
             return await self.prompt(uid)
-        if action=='style' and len(parts)==4 and parts[2].isdigit() and parts[3] in ('classic','romantic','playful','elegant'):
+        if action=='style' and len(parts)==4 and parts[2].isdigit():
             mid=int(parts[2])
             item=await self.db.invite(mid)
             flow=await self.db.flow(uid)
-            if not item or item['sender']!=uid or item['status']!='draft' or not flow or flow['invite_id']!=mid or flow['stage']!='preview': return
+            if not item or item['sender']!=uid or item['status']!='draft' or not flow or flow['invite_id']!=mid or flow['stage']!='preview' or not valid_design(parts[3], item['type']): return
             await self.db.run('UPDATE q_invites SET design=? WHERE id=?',(parts[3],mid))
             return await self.preview(uid,await self.db.invite(mid))
         if len(parts)!=3 or not parts[2].isdigit(): return
@@ -475,9 +475,10 @@ class App:
         flow=await self.db.flow(uid)
         if not flow or flow['invite_id']!=mid or item['status']!='draft': return
         if action=='design' and flow['stage']=='preview':
+            choices = [(f"{d['emoji']} {d['label_uz']}", f"q:style:{mid}:{d['id']}")
+                       for d in DESIGNS.values() if d['type']==item['type']]
             return await self.send(uid,'<b>Taklif dizaynini tanlang:</b>\nTanlagandan so‘ng ko‘rinishini ochib tekshirishingiz mumkin.',reply_markup=kb(
-                [('🤍 Sodda',f'q:style:{mid}:classic'),('🌸 Romantik',f'q:style:{mid}:romantic')],
-                [('🎉 Quvnoq',f'q:style:{mid}:playful'),('✨ Nafis',f'q:style:{mid}:elegant')]))
+                *(choices[i:i+2] for i in range(0,len(choices),2))))
         if action=='skip' and flow['stage']=='media':
             await self.db.run("UPDATE q_invites SET media_kind='none',file_id='' WHERE id=?",(mid,))
             await self.db.stage(uid,'title',mid)

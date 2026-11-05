@@ -8,3 +8,7 @@
 !web_common.py
 !web_minimal/
 !web_minimal/**
+
+!designs.py
+!react_src/
+!react_src/designs.json

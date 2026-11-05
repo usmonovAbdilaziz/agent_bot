@@ -340,3 +340,40 @@ async def test_schema_upgrade_preserves_old_acceptance_without_backfill(n):
     assert restored['status']=='accepted' and restored['no_attempts']==0
     assert await n.db.accept(item['id'],2,10)
     assert not await n.db.all('SELECT * FROM q_accept_notices')
+
+async def test_design_registry_migration_is_idempotent(n, api):
+    item = await ready(n)
+    await n.db.run('ALTER TABLE q_invites DROP COLUMN type')
+    await n.db.run('ALTER TABLE q_invites DROP COLUMN details')
+    await n.db.init()
+    await n.db.init()
+    migrated = await n.db.invite(item['id'])
+    assert migrated['type'] == 'fun' and json.loads(migrated['details']) == {}
+    await n.msg(2, f'/start i_{item["token"]}')
+    status, data = await api('GET', f'/api/invites/{item["id"]}', 2)
+    assert status == 200 and data['type'] == 'fun' and data['details'] == {}
+    status, data = await api('POST', f'/api/invites/{item["id"]}/accept', 2, json={})
+    assert status == 200 and data['accepted']
+
+async def test_invalid_design_and_type_are_rejected(n):
+    mid = await draft(n)
+    await n.cb(1, f'q:style:{mid}:unknown')
+    assert (await n.db.invite(mid))['design'] == 'classic'
+    await n.db.run("UPDATE q_invites SET type='ceremony' WHERE id=?", (mid,))
+    await n.cb(1, f'q:style:{mid}:romantic')
+    assert (await n.db.invite(mid))['design'] == 'classic'
+    assert await n.db.publish(mid, 1, n.cfg.ttl) is None
+    await n.db.run("UPDATE q_invites SET type='fun', design='unknown' WHERE id=?", (mid,))
+    assert await n.db.publish(mid, 1, n.cfg.ttl) is None
+
+
+@pytest.mark.parametrize('legacy_design', ['', 'old-design'])
+async def test_unknown_legacy_design_opens_as_classic_and_can_be_accepted(n, api, legacy_design):
+    item = await ready(n)
+    await n.db.run('UPDATE q_invites SET design=? WHERE id=?', (legacy_design, item['id']))
+    await n.msg(2, f'/start i_{item["token"]}')
+    status, data = await api('GET', f'/api/invites/{item["id"]}', 2)
+    assert status == 200 and data['design'] == 'classic'
+    status, data = await api('POST', f'/api/invites/{item["id"]}/accept', 2, json={})
+    assert status == 200 and data['accepted']
+    assert (await n.db.invite(item['id']))['design'] == legacy_design
