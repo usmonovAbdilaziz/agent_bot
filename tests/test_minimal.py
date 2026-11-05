@@ -43,6 +43,7 @@ async def draft(n, media=False, uid=1):
     else: await n.cb(uid,f'q:skip:{mid}')
     await n.cb(uid,f'q:name:{mid}')
     await n.msg(uid,'Siz bilan uchrashsam bo‘ladimi?')
+    await n.cb(uid,f'q:layout:{mid}:bottom')
     return mid
 
 async def ready(n,media=False):
@@ -109,6 +110,7 @@ async def test_full_name_optional_media_edit_and_one_confirmation(n):
     await n.cb(1,f'q:skip:{mid}')
     await n.msg(1,'Yangi ism')
     await n.msg(1,'<script>Matn & izoh</script>')
+    await n.cb(1,f'q:layout:{mid}:bottom')
     await n.cb(1,f'q:confirm:{mid}')
     token=(await n.db.invite(mid))['token']
     link_count=len(n.sent(1))
@@ -131,6 +133,7 @@ async def test_stale_buttons_duplicate_updates_and_restart(n):
     await n.msg(1,'/start')
     assert 'Tavsif yuboring' in n.sent(1)[-1]['text']
     await n.msg(1,'Davom etgan tavsif')
+    await n.cb(1,f'q:layout:{mid}:bottom')
     await n.cb(1,f'q:confirm:{mid}')
     assert (await n.db.invite(mid))['status']=='ready'
 
@@ -144,6 +147,7 @@ async def test_video_boundary_and_preview(n,note):
     await video(n,60,MAX_MEDIA,note=note)
     assert (await n.db.flow(1))['stage']=='title'
     await n.cb(1,f'q:name:{mid}'); await n.msg(1,'Video taklif')
+    await n.cb(1,f'q:layout:{mid}:bottom')
     assert n.sent(1,'sendVideoNote' if note else 'sendVideo')
     assert (await n.db.invite(mid))['media_kind']==('video_note' if note else 'video')
 
@@ -216,6 +220,7 @@ async def test_photo_uses_smaller_variant_and_cache_still_enforces_permissions(n
     assert (await n.db.invite(mid))['file_id']=='medium'
     await n.cb(1,f'q:name:{mid}')
     await n.msg(1,'Taklif matni')
+    await n.cb(1,f'q:layout:{mid}:bottom')
     await n.cb(1,f'q:confirm:{mid}')
     item=await n.db.invite(mid)
     await n.msg(2,f'/start i_{item["token"]}')
@@ -351,7 +356,7 @@ async def test_design_registry_migration_is_idempotent(n, api):
     assert migrated['type'] == 'fun' and json.loads(migrated['details']) == {}
     await n.msg(2, f'/start i_{item["token"]}')
     status, data = await api('GET', f'/api/invites/{item["id"]}', 2)
-    assert status == 200 and data['type'] == 'fun' and data['details'] == {}
+    assert status == 200 and data['type'] == 'fun' and data['details']['layout']['text_position'] == 'bottom'
     status, data = await api('POST', f'/api/invites/{item["id"]}/accept', 2, json={})
     assert status == 200 and data['accepted']
 
@@ -377,3 +382,25 @@ async def test_unknown_legacy_design_opens_as_classic_and_can_be_accepted(n, api
     status, data = await api('POST', f'/api/invites/{item["id"]}/accept', 2, json={})
     assert status == 200 and data['accepted']
     assert (await n.db.invite(item['id']))['design'] == legacy_design
+
+
+@pytest.mark.parametrize('position', ['top','center','bottom'])
+async def test_layout_selection_and_api(n, api, position):
+    await n.cb(1,'q:self'); mid=(await n.db.flow(1))['invite_id']
+    await n.cb(1,f'q:skip:{mid}'); await n.cb(1,f'q:name:{mid}')
+    await n.msg(1,'Matn')
+    assert (await n.db.flow(1))['stage']=='layout'
+    await n.cb(1,f'q:layout:{mid}:invalid')
+    assert (await n.db.flow(1))['stage']=='layout'
+    await n.cb(1,f'q:layout:{mid}:{position}')
+    assert (await n.db.flow(1))['stage']=='preview'
+    status, data=await api('GET',f'/api/invites/{mid}',1)
+    assert status==200 and data['details']['layout']['text_position']==position
+    await n.cb(1,f'q:confirm:{mid}')
+    assert (await n.db.invite(mid))['status']=='ready'
+
+@pytest.mark.parametrize('bad', ['{"layout":{"text_position":"left"}}','{"layout":[]}', '[]', 'broken'])
+async def test_invalid_layout_cannot_be_published(n, bad):
+    mid=await draft(n)
+    await n.db.run('UPDATE q_invites SET details=? WHERE id=?',(bad,mid))
+    assert await n.db.publish(mid,1,n.cfg.ttl) is None

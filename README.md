@@ -82,7 +82,7 @@ Bot tokeni o‘zgarsa sender telefonini qayta tasdiqlash/tanlash kerak bo‘ladi
    60 soniyagacha, fayl 20 MiB gacha. Media kerak bo‘lmasa **Rasm/videosiz davom etish**.
 2. **Ism**: Telegram full name avtomatik chiqadi. **Shu ismni qoldirish** yoki
    o‘zingiz yangi ism/matn yozing (1–120 belgi).
-3. **Tavsif**: taklif matnini yuboring (1–2000 belgi).
+3. **Tavsif**: taklif matnini yuboring (1–2000 belgi); keyin matnni yuqori, o‘rta yoki pastga joylashtiring yoki standart pastki joyni tanlang.
 4. **Ko‘rib chiqish**: media va matn chatda chiqadi. **Ko‘rinishini ochish** receiver
    sahifasining aynan o‘zini ko‘rsatadi. **Dizaynni tanlash** orqali Sodda, Romantik,
    Quvnoq yoki Nafis ko‘rinishni tanlang va preview orqali tekshiring. **Tahrirlash**
@@ -101,7 +101,7 @@ bosganda havola unga birikadi. Bot faqat **Taklifni ochish** tugmasini yuboradi.
 Telegram `/start` javobidan Mini Appni avtomatik ochishga ruxsat bermaydi:
 foydalanuvchi bu tugmani bir marta bosadi.
 
-Sahifada dumaloq media (agar bor bo‘lsa), ism, tavsif, **Ha / Yo‘q** turadi.
+Sahifada rasm/video butun ekran foni bo‘ladi; media bo‘lmasa dizayn gradienti ko‘rinadi. Uning ustida ism, tavsif va **Ha / Yo‘q** turadi.
 Video ovozsiz o‘ynaydi; **Ovozni yoqish** bilan ovoz yoqiladi. Yo‘q tugmasi
 sichqoncha/teginish/klaviaturadan qochadi. Har 10 urinishda 😡 stiker ko‘rinishidagi
 reaksiya vaqtincha chiqadi va urinishlar davom etadi. Telegramning yopish tugmasi

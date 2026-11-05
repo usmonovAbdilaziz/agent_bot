@@ -165,6 +165,7 @@ async def test_minimal_video_invitation_through_postman(tmp_path,notice_error):
             await update(1,video={'file_id':'video_id','file_unique_id':'unique','duration':60,'width':200,'height':200,'file_size':1024,'mime_type':'video/mp4'})
             await update(1,callback='q:name:1')
             await update(1,'Postman orqali video taklif')
+            await update(1,callback='q:layout:1:bottom')
             await update(1,callback='q:confirm:1')
             item=await db.invite(1)
             assert item['token'] and item['link_sent'] and item['title']=='Sinov Sender'
@@ -227,6 +228,7 @@ async def test_minimal_video_invitation_through_postman(tmp_path,notice_error):
                 await update(2,callback=f'q:skip:{mid}')
                 await update(2,callback=f'q:name:{mid}')
                 await update(2,'Ruxsat bilan yaratilgan taklif')
+                await update(2,callback=f'q:layout:{mid}:bottom')
                 await update(2,callback=f'q:confirm:{mid}')
                 assert (await db.invite(mid))['token'] and not await app.is_sender(2)
                 await update(1,callback=f'q:approve:{request["id"]}')
@@ -238,6 +240,7 @@ async def test_minimal_video_invitation_through_postman(tmp_path,notice_error):
                 await update(1,callback=f'q:skip:{fresh}')
                 await update(1,callback=f'q:name:{fresh}')
                 await update(1,'Avvalgi receiverga yangi taklif')
+                await update(1,callback=f'q:layout:{fresh}:bottom')
                 await update(1,callback=f'q:confirm:{fresh}')
                 invitation=await db.invite(fresh)
                 await update(2,f'/start i_{invitation["token"]}')

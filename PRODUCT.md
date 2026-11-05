@@ -24,7 +24,7 @@ bo‘lishni tasdiqlasa, admin ruxsati so‘raladi. Tasdiq bitta havola uchun ama
 Raqam orqali tanlangan sender o‘z kontaktini tasdiqlaydi; bu ruxsat ham bir martalik.
 Sender chatdagi ketma-ket bosqichlardan o‘tadi; brauzerda parallel yaratish formasi yo‘q.
 Tasdiqlash yagona havola yaratadi. Media optional, video <=60 soniya va <=20 MiB.
-Receiver tartibi: dumaloq media → title → description → Ha/Yo‘q.
+Receiver tartibi: to‘liq ekran fon media yoki gradient, uning ustida title, description va Ha/Yo‘q. Matn joyi yuqori, o‘rta yoki past.
 Yo‘q qochadi; har 10 urinishda vaqtinchalik 😡 chiqadi, so‘ng davom etadi.
 Ha atomik ravishda yakunlaydi; suhbat, relay va qo‘shimcha moderatsiya ochilmaydi.
 Telegram /startdan avtomatik browser ochmaydi: bitta Taklifni ochish tugmasi kerak.

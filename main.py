@@ -4,6 +4,7 @@ import contextlib
 import hashlib
 import hmac
 import html
+import json
 import logging
 import re
 import time
@@ -16,7 +17,7 @@ from aiogram.types import (BotCommand, CallbackQuery, InlineKeyboardButton, Inli
     KeyboardButton, Message, ReplyKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo, MenuButtonCommands)
 from designs import DESIGNS, valid_design
 from config import Config
-from invitation_store import InvitationDB
+from invitation_store import InvitationDB, parse_details
 
 MAX_MEDIA = 20 * 1024 * 1024
 
@@ -273,6 +274,10 @@ class App:
                 reply_markup=kb([('Shu ismni qoldirish',f'q:name:{mid}')]))
         elif flow['stage']=='description':
             await self.send(uid,'<b>Tavsif yuboring:</b>\nTaklifingiz matnini yozing.')
+        elif flow['stage']=='layout':
+            await self.send(uid,'<b>Matn qayerda joylashsin?</b>', reply_markup=kb(
+                [('Yuqorida',f'q:layout:{mid}:top'),('O‘rtada',f'q:layout:{mid}:center')],
+                [('Pastda',f'q:layout:{mid}:bottom'),('O‘tkazib yuborish',f'q:layout:{mid}:bottom')]))
         elif flow['stage']=='preview':
             await self.preview(uid,item)
 
@@ -389,7 +394,7 @@ class App:
                 return await self.send(uid,f'Matn 1–{limit} belgidan iborat bo‘lsin.')
             column=flow['stage']
             await self.db.run(f'UPDATE q_invites SET {column}=? WHERE id=?',(text,item['id']))
-            await self.db.stage(uid,'description' if column=='title' else 'preview',item['id'])
+            await self.db.stage(uid,'description' if column=='title' else 'layout',item['id'])
             return await self.prompt(uid)
         return await self.prompt(uid)
 
@@ -459,6 +464,18 @@ class App:
         if action=='new':
             await self.db.begin(uid)
             return await self.prompt(uid)
+        if action=='layout' and len(parts)==4 and parts[2].isdigit():
+            mid=int(parts[2])
+            item=await self.db.invite(mid)
+            flow=await self.db.flow(uid)
+            if not item or item['sender']!=uid or item['status']!='draft' or not flow or flow['invite_id']!=mid or flow['stage']!='layout': return
+            if parts[3] not in ('top','center','bottom'): return
+            details=parse_details(item['details'])
+            if details is None: return await self.send(uid,'Taklif ma’lumotlari noto‘g‘ri.')
+            details['layout']={**details.get('layout',{}), 'text_position':parts[3]}
+            await self.db.run('UPDATE q_invites SET details=? WHERE id=?',(json.dumps(details,ensure_ascii=False),mid))
+            await self.db.stage(uid,'preview',mid)
+            return await self.preview(uid,await self.db.invite(mid))
         if action=='style' and len(parts)==4 and parts[2].isdigit():
             mid=int(parts[2])
             item=await self.db.invite(mid)

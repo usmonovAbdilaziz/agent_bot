@@ -42,7 +42,8 @@ GET /api/invites/{id}: sender preview or assigned receiver only; returns id, tit
 description, media_kind (none/photo/video/video_note), status, preview; other users 404.
 The response also contains design: classic, romantic, playful or elegant. Existing
 invitations default to classic; legacy unknown designs are returned as classic. Sender selects it from the bot's draft preview.
-The response also includes type (currently fun) and details (a JSON object, default {}).
+The response also includes type (currently fun) and details (a JSON object). details.layout.text_position is top, center or bottom;
+old records without it are returned with bottom. Invalid stored layouts cannot be published.
 Publishing and design selection reject designs that do not belong to the invitation type.
 GET /api/invites/{id}/media: same permission, bounded Telegram download proxied as
 JPEG or MP4. No media =>404; upstream failure =>502. Browser uses authenticated fetch

@@ -10,14 +10,14 @@ const out=path.join(root,'output/minimal');
  const browser=await chromium.launch({headless:true});
  const results=[];
  try {
-  for(const [name,width,height] of [['mobile',390,844],['desktop',1280,800],['small',280,600]]) {
+  for(const [name,width,height] of [['mobile',390,844],['desktop',1280,800],['small',360,640]]) {
    const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
    const page=await context.newPage();
    let accepted=0, fail=true;
    const counts=[];
    const errors=[];page.on('pageerror',error=>errors.push(error.message));
    await page.addInitScript(()=>{window.Telegram={WebApp:{initData:'TEST_FIXTURE',ready(){},expand(){},close(){window.didClose=true;},HapticFeedback:{impactOccurred(){},notificationOccurred(){}}}};});
-   let kind='none', preview=false, design='classic', videoBytes=null, videoType='video/webm';
+   let kind='none', preview=false, design='classic', videoBytes=null, videoType='video/webm', mediaFail=false, mediaColor='#dde8f0', position='bottom', longText=false;
    await context.route('https://telegram.org/**',route=>route.fulfill({contentType:'application/javascript',body:''}));
    await context.route('http://qadam.test/**',async route=>{
     const url=new URL(route.request().url());
@@ -26,9 +26,10 @@ const out=path.join(root,'output/minimal');
      counts.push(route.request().postDataJSON().no_attempts);
      return route.fulfill({status:fail?502:200,contentType:'application/json',body:JSON.stringify(fail?{error:'Aloqa uzildi. Qayta urinib ko‘ring.'}:{accepted:true})});
     }
+    if(url.pathname.endsWith('/media') && mediaFail) return route.fulfill({status:502,contentType:'application/json',body:JSON.stringify({error:'Media yuklanmadi.'})});
     if(url.pathname.endsWith('/media') && kind==='video') return route.fulfill({contentType:videoType,body:videoBytes});
-    if(url.pathname.endsWith('/media')) return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180"><rect width="180" height="180" fill="#dde8f0"/><text x="90" y="112" text-anchor="middle" font-family="sans-serif" font-size="64" fill="#38566e">M</text></svg>'});
-    if(url.pathname.startsWith('/api/') || url.pathname.startsWith('/bot/api/')) return route.fulfill({contentType:'application/json',body:JSON.stringify({id:1,title:'Munis',description:'Siz bilan uchrashsam bo‘ladimi?\nBir piyola choy ustida suhbatlashamiz.',media_kind:kind,status:'ready',preview,design})});
+    if(url.pathname.endsWith('/media')) return route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180"><rect width="180" height="180" fill="${mediaColor}"/></svg>`});
+    if(url.pathname.startsWith('/api/') || url.pathname.startsWith('/bot/api/')) return route.fulfill({contentType:'application/json',body:JSON.stringify({id:1,title:'Munis',description:longText?'Juda uzun matn. '.repeat(120):'Siz bilan uchrashsam bo‘ladimi?\nBir piyola choy ustida suhbatlashamiz.',media_kind:kind,status:'ready',preview,design,details:{layout:{text_position:position}}})});
     const file=url.pathname==='/' || url.pathname==='/bot/'?'index.html':path.basename(url.pathname);
     return route.fulfill({contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html',body:await fs.readFile(path.join(root,'web_minimal',file))});
    });
@@ -68,6 +69,32 @@ const out=path.join(root,'output/minimal');
    assert.equal(await page.locator('.yes').isDisabled(),true);
    assert.equal(await page.locator('.no').isDisabled(),true);
    await page.screenshot({path:path.join(out,`${name}-preview.png`),fullPage:true});
+   // Check scrollable long copy, position variants and contrast over extreme backgrounds.
+   const m1out=path.join(root,'output/m1'); await fs.mkdir(m1out,{recursive:true});
+   await page.emulateMedia({reducedMotion:'reduce'});
+   longText=true;
+   for (const where of ['top','center','bottom']) {
+    position=where;
+    for (const color of ['#ffffff','#000000']) {
+     mediaColor=color;
+     await page.goto('http://qadam.test/?invite=1');
+     await page.locator('img.media').waitFor();
+     await page.waitForFunction(()=>document.querySelector('img').naturalWidth>0);
+     const layout=await page.evaluate(()=>{
+      const panel=document.querySelector('.text-panel'), arena=document.querySelector('.arena'), bg=document.querySelector('.media');
+      const a=panel.getBoundingClientRect(), b=arena.getBoundingClientRect(), m=bg.getBoundingClientRect();
+      return {panelBottom:a.bottom,arenaTop:b.top,scrollable:panel.scrollHeight>panel.clientHeight,mediaWidth:m.width,mediaHeight:m.height,white:getComputedStyle(panel).color,back:getComputedStyle(panel).backgroundColor};
+     });
+     assert.ok(layout.panelBottom<=layout.arenaTop && layout.scrollable);
+     assert.equal(layout.mediaWidth,width); assert.equal(layout.mediaHeight,height);
+     assert.equal(layout.white,'rgb(255, 255, 255)');
+     const alpha=Number(layout.back.match(/[\d.]+/g)[3]);
+     const max=(1-alpha); const linear=max<=0.04045?max/12.92:((max+0.055)/1.055)**2.4;
+     assert.ok(1.05/(linear+0.05)>=4.5);
+     await page.screenshot({path:path.join(m1out,`${name}-${where}-${color==='#ffffff'?'light':'dark'}.png`)});
+    }
+   }
+   longText=false; position='bottom'; mediaColor='#dde8f0';
    for (const option of ['romantic','playful','elegant']) {
     design=option;
     await page.goto('http://qadam.test/?invite=1');
@@ -93,7 +120,11 @@ const out=path.join(root,'output/minimal');
      stream.getTracks().forEach(track=>track.stop());
      return {mime,bytes:Array.from(new Uint8Array(await new Blob(parts).arrayBuffer()))};
     });
-    videoBytes=Buffer.from(encoded.bytes);videoType=encoded.mime;kind='video';preview=false;
+    videoBytes=Buffer.from(encoded.bytes);videoType=encoded.mime;kind='video';preview=false; mediaFail=true;
+    await page.goto('http://qadam.test/?invite=1');
+    await page.getByRole('button',{name:'Qayta yuklash'}).waitFor();
+    mediaFail=false; await page.getByRole('button',{name:'Qayta yuklash'}).click();
+    await page.locator('video.media').waitFor();
     await page.goto('http://qadam.test/?invite=1');
     await page.locator('video.media').waitFor();
     await page.waitForFunction(()=>document.querySelector('video').readyState>=2);
@@ -101,7 +132,7 @@ const out=path.join(root,'output/minimal');
     await page.getByRole('button',{name:'Ovozni yoqish'}).click();
     assert.equal(await page.locator('video').evaluate(v=>v.muted),false);
     await page.screenshot({path:path.join(out,'mobile-video.png'),fullPage:true});
-    results.push('video: decoded browser video fixture, circular rendering, mute/unmute PASS');
+    results.push('video: decoded browser video fixture, full-screen background, mute/unmute PASS');
    }
    assert.deepEqual(errors,[]);
    results.push(`${name}: layout, 10 attempts, sticker, continued movement, failed accept retry, fireworks/close, photo preview PASS`);

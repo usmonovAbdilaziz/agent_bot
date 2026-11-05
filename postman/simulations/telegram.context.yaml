@@ -2,6 +2,13 @@ purpose:
   stands_in_for: Telegram Bot API ning rasm, xabar, callback va polling metodlari
   unblocks: Haqiqiy token va foydalanuvchilarsiz Dispatcher, HTTP va SQLite oqimlarini tekshirish
 assumptions:
+  - id: m1-layout-selection-20261105
+    status: supported
+    claim: Sender can choose a text position before preview and publish, and acceptance still notifies the sender through the local Telegram stand-in.
+    reason: Dispatcher, SQLite and authenticated Mini App API were exercised against the repository-owned Telegram mock.
+    verification: Five Postman integration tests passed with default bottom selection, including startup, video invitation and notification failure cases. Live Telegram interaction remains unverified.
+    source: tests/test_postman.py; postman/mocks/telegram/default.js
+    updated_at: '2026-11-05'
   - id: registration-quota-suggestions-20261103
     status: supported
     claim: In local tests against the repository-owned Telegram stand-in, a verified user can request a link allowance and the admin can approve it; an approved text suggestion adds one credit only once.

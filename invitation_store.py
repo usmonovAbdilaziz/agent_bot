@@ -1,4 +1,5 @@
 """Minimal invitation state; additive tables preserve the previous database."""
+import json
 import secrets
 import time
 from db import DB
@@ -32,6 +33,19 @@ CREATE TABLE IF NOT EXISTS q_sender_requests(
  admin_notified INTEGER NOT NULL DEFAULT 0, decision_notified INTEGER NOT NULL DEFAULT 0);
 CREATE UNIQUE INDEX IF NOT EXISTS q_one_sender_request ON q_sender_requests(uid) WHERE status='pending';
 """
+
+def parse_details(raw):
+    try:
+        value = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(value, dict):
+        return None
+    layout = value.get('layout', {})
+    if not isinstance(layout, dict) or layout.get('text_position', 'bottom') not in ('bottom', 'center', 'top'):
+        return None
+    return value
+
 
 class InvitationDB(DB):
     async def init(self, moderation=True):
@@ -148,7 +162,7 @@ class InvitationDB(DB):
     async def publish(self, mid, uid, ttl):
         async with self.connect(True) as c:
             row = await (await c.execute('SELECT * FROM q_invites WHERE id=? AND sender=?',(mid,uid))).fetchone()
-            if not row or not row['description'].strip() or not valid_design(row['design'], row['type']):
+            if not row or not row['description'].strip() or not valid_design(row['design'], row['type']) or parse_details(row['details']) is None:
                 return None
             if row['status']=='draft':
                 if not await self._can_publish(c,uid): return None

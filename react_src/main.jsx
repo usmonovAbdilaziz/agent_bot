@@ -103,7 +103,7 @@ function useFireworks(active) {
   }, [active]);
 }
 
-function Media({ invite, onError }) {
+function BackgroundMedia({ invite, onError }) {
   const [state, setState] = useState({ status: invite.media_kind === 'none' ? 'empty' : 'loading' });
   const [muted, setMuted] = useState(true);
   const videoRef = useRef(null);
@@ -146,12 +146,12 @@ function Media({ invite, onError }) {
   }, [state.status]);
 
   if (state.status === 'empty') return null;
-  if (state.status === 'loading') return <div className="media-wrap"><p className="media-note">Media yuklanmoqda…</p></div>;
+  if (state.status === 'loading') return <p className="media-note media-control">Media yuklanmoqda…</p>;
   if (state.status === 'error') {
-    return <div className="media-wrap"><p className="media-note">{state.message}</p><button type="button" onClick={load}>Qayta yuklash</button></div>;
+    return <div className="media-control"><p className="media-note">{state.message}</p><button type="button" onClick={load}>Qayta yuklash</button></div>;
   }
   if (invite.media_kind === 'photo') {
-    return <div className="media-wrap"><img className="media" src={state.url} alt="Taklif rasmi" onError={failed} /></div>;
+    return <img className="media" src={state.url} alt="" onError={failed} />;
   }
   const toggleSound = () => {
     const video = videoRef.current;
@@ -162,12 +162,12 @@ function Media({ invite, onError }) {
     video.play().catch(() => onError('Videoni ijro etib bo‘lmadi.'));
   };
   return (
-    <div className="media-wrap">
+    <>
       <video ref={videoRef} className="media" src={state.url} muted={muted} autoPlay loop playsInline aria-label="Taklif videosi" onError={failed} />
-      <button className="sound" type="button" onClick={toggleSound} aria-pressed={String(!muted)}>
+      <button className="sound media-control" type="button" onClick={toggleSound} aria-pressed={String(!muted)}>
         {muted ? 'Ovozni yoqish' : 'Ovozni o‘chirish'}
       </button>
-    </div>
+    </>
   );
 }
 
@@ -268,13 +268,18 @@ function Invitation({ invite, onStatus, accepted }) {
   };
 
   return (
-    <section className={`invitation design-${DESIGNS[invite.design]?.type === (invite.type || 'fun') ? invite.design : 'classic'}`}>
-      <Media invite={invite} onError={message => onStatus(message, true)} />
-      <h1>{invite.title}</h1>
-      <p className="description">{invite.description}</p>
-      <ChoiceArena disabled={accepting || invite.preview} onAccept={accept} onEvasion={onEvasion} />
+    <section className={`invitation design-${DESIGNS[invite.design]?.type === (invite.type || 'fun') ? invite.design : 'classic'} position-${['top', 'center', 'bottom'].includes(invite.details?.layout?.text_position) ? invite.details.layout.text_position : 'bottom'}`}>
+      <BackgroundMedia invite={invite} onError={message => onStatus(message, true)} />
+      <div className="scrim" aria-hidden="true" />
+      <div className="invitation-content">
+        <div className="text-panel" tabIndex="0">
+          <h1>{invite.title}</h1>
+          <p className="description">{invite.description}</p>
+        </div>
+        <ChoiceArena disabled={accepting || invite.preview} onAccept={accept} onEvasion={onEvasion} />
+        <p className={`preview-note${invite.preview ? '' : ' preview-placeholder'}`} aria-hidden={!invite.preview}>Oluvchiga shunday ko‘rinadi. Tasdiqlash uchun botga qayting.</p>
+      </div>
       <div className="sticker" hidden={!sticker} role="img" aria-label="Jahli chiqqan stiker">😡</div>
-      {invite.preview && <p className="preview-note">Oluvchiga shunday ko‘rinadi. Tasdiqlash uchun botga qayting.</p>}
     </section>
   );
 }
