@@ -89,7 +89,7 @@ async def video(n,duration=60,size=1024,note=False):
 
 async def test_admin_has_two_choices_and_only_admin_assigns(n):
     menu=json.loads(n.sent(1)[-1]['reply_markup'])['inline_keyboard']
-    assert [b['text'] for row in menu for b in row]==['O‘zim','Boshqa raqam','Sender so‘rovlari','Takliflar']
+    assert [b['text'] for row in menu for b in row]==['O‘zim','Boshqa raqam','Sender so‘rovlari','Takliflar','Taklif turini tanlash']
     await n.msg(2,'/start'); await n.cb(2,'q:self'); await n.cb(2,'q:phone')
     assert not await n.db.all('SELECT * FROM q_invites')
     assert not await n.db.flow(2)

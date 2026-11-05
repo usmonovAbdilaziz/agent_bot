@@ -135,7 +135,8 @@ class App:
         if uid == await self.admin():
             await self.send(uid,'<b>Kim taklif yuboradi?</b>',reply_markup=kb(
                 [('O‘zim','q:self'),('Boshqa raqam','q:phone')],
-                [('Sender so‘rovlari','q:requests'),('Takliflar','q:ideas')]))
+                [('Sender so‘rovlari','q:requests'),('Takliflar','q:ideas')],
+                [('Taklif turini tanlash','q:check')]))
         elif await self.is_sender(uid):
             flow = await self.db.flow(uid)
             if flow: await self.prompt(uid)
@@ -283,6 +284,22 @@ class App:
             await self.prompt(target)
         await self.send(uid,'Sender bitta havola uchun tanlandi. U ushbu bot havolasini ochib, /start bosadi va kerak bo‘lsa raqamini tasdiqlaydi:\n'
             f'https://t.me/{self.username}',reply_markup=kb([('Yangi taklif','q:home')]))
+
+    async def select_type(self, uid):
+        if not await self.is_sender(uid):
+            return await self.send(uid,'Taklif yaratish uchun avval /start orqali sender ruxsatini oling.')
+        if await self.db.one('SELECT uid FROM q_suggestion_drafts WHERE uid=?',(uid,)):
+            return await self.send(uid,'Taklif matni kutilmoqda. Davom eting yoki /cancel bilan bekor qiling.')
+        flow=await self.db.flow(uid)
+        if flow and flow['stage']!='type':
+            return await self.send(uid,'Sizda tugallanmagan jarayon bor. /start orqali davom eting yoki /cancel bilan qoralamani bekor qiling.')
+        if not flow:
+            draft=await self.db.one("SELECT id FROM q_invites WHERE sender=? AND status='draft'",(uid,))
+            if draft:
+                return await self.send(uid,'Tugallanmagan qoralama saqlangan. Uni bekor qilish uchun /cancel yuboring.')
+            if await self.db.begin(uid) is None:
+                return await self.send(uid,'Taklif yaratish uchun ruxsat kerak.')
+        return await self.prompt(uid)
 
     async def prompt(self, uid):
         flow = await self.db.flow(uid)
@@ -453,6 +470,7 @@ class App:
             flow = await self.db.flow(uid)
             if flow and await self.is_sender(uid): return await self.prompt(uid)
             return await self.home(uid)
+        if cmd=='/check': return await self.select_type(uid)
         if cmd=='/guests': return await self.guests(uid)
         if m.contact: return await self.contact(m)
         if cmd=='/admin' and uid==await self.admin(): return await self.home(uid)
@@ -541,6 +559,7 @@ class App:
                 draft=await self.db.invite(int(parts[2]))
                 if draft and draft['sender']==uid and draft['type']=='ceremony' and draft['status']=='draft':
                     return await self.send(uid,'Marosim yaratish vaqtincha o‘chirilgan.')
+        if action=='check': return await self.select_type(uid)
         if action=='guests' and len(parts)==4 and parts[2].isdigit() and parts[3].isdigit(): return await self.guests(uid,int(parts[2]),int(parts[3]))
         if action=='glist' and len(parts)==3 and parts[2].isdigit(): return await self.guests(uid,page=int(parts[2]))
         if action=='request': return await self.request_sender(uid)
@@ -730,7 +749,7 @@ async def main():
         notices = asyncio.create_task(app.acceptance_notifications())
         try:
             await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
-            await bot.set_my_commands([BotCommand(command='start',description='Boshlash yoki davom etish'),BotCommand(command='taklif',description='Taklif yuborish'),BotCommand(command='guests',description='Mehmonlar ro‘yxati')])
+            await bot.set_my_commands([BotCommand(command='start',description='Boshlash yoki davom etish'),BotCommand(command='check',description='Taklif turini tanlash'),BotCommand(command='taklif',description='Taklif yuborish'),BotCommand(command='guests',description='Mehmonlar ro‘yxati')])
             await bot.delete_webhook(drop_pending_updates=False)
             app.ready=True
             logging.warning('Minimal taklif boti ishga tushdi: @%s',me.username)

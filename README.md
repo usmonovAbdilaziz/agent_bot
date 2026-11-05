@@ -199,6 +199,10 @@ Yangi ceremony uchun standart ochiq havola: bot rejim tanlashda havola egalariga
 
 Ceremony dizaynlari: `atlas`, `nafis`, `gold`, `envelope`, `ticket`. Ilgari saqlangan `ceremony_elegant` qiymati `nafis`ga migratsiya qilinadi. Aktivlar lokal CSS, tizim serif shriftlari va mavjud rasm/video fonidan iborat; tashqi shrift yoki CDN ishlatilmaydi.
 
+### Taklif turini tanlash
+
+Ruxsatli sender `/check` buyrug‘i bilan taklif yaratishni boshlaydi; admin menyusida **Taklif turini tanlash** tugmasi ham mavjud. `ENABLE_CEREMONY=true` bo‘lsa fun yoki marosim turi tanlanadi; o‘chiq bo‘lsa fun oqimi ochiladi. Tugallanmagan qoralama saqlanadi va `/start` bilan davom ettiriladi.
+
 ### Release flag va dizayn qo‘shish
 
 `ENABLE_CEREMONY=false` standart qiymat: yangi taklif fun oqimiga o‘tadi. `true` yangi ceremony yaratishni ko‘rsatadi; oldin yaratilgan ceremony havolalari va RSVP flagdan qat’i nazar ishlaydi. Lokal sozlama loyiha `.env` faylida; production deployer `/home/ubuntu/apps/agent_bot/.env` faylini Docker `--env-file` bilan o‘qiydi. Prod’da yoqish uchun operator shu faylda `ENABLE_CEREMONY=true` belgilaydi va keyingi Verified `main` deployida konteynerni yangidan yaratadi; `docker restart` env faylini qayta o‘qimaydi. Keyin health va test taklifni tekshiradi. Hech qachon tokenni hujjatga yozmang.

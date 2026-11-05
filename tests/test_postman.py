@@ -60,7 +60,7 @@ async def test_full_main_starts_webapp_menu_and_polling(tmp_path,monkeypatch):
             menu=next(c for c in calls if c['method']=='setChatMenuButton')
             assert json.loads(menu['body']['menu_button'])['type']=='commands'
             commands=next(c for c in calls if c['method']=='setMyCommands')
-            assert [c['command'] for c in json.loads(commands['body']['commands'])]==['start','taklif','guests']
+            assert [c['command'] for c in json.loads(commands['body']['commands'])]==['start','check','taklif','guests']
             async with http.get(f'http://127.0.0.1:{port}/') as response:
                 assert response.status==200 and 'Siz uchun taklif' in await response.text()
             async with http.get(f'http://127.0.0.1:{port}/assets/app.js') as response:
