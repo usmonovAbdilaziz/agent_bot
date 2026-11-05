@@ -1,5 +1,6 @@
 """Receiver-only Mini App API. Acceptance never starts a relay session."""
 import io
+import json
 import time
 import asyncio
 from collections import OrderedDict
@@ -61,6 +62,7 @@ async def invite_for(request):
 async def detail(request):
     item=await invite_for(request)
     return web.json_response({k:item[k] for k in ('id','title','description','media_kind','status','design')} | {
+        'type':item['type'], 'details':json.loads(item['details']),
         'preview':request['uid']==item['sender']})
 
 class BoundedBuffer(io.BytesIO):

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
+import { DESIGNS } from './designs';
 
 const tg = window.Telegram?.WebApp;
 
@@ -267,7 +268,7 @@ function Invitation({ invite, onStatus, accepted }) {
   };
 
   return (
-    <section className={`invitation design-${['romantic', 'playful', 'elegant'].includes(invite.design) ? invite.design : 'classic'}`}>
+    <section className={`invitation design-${DESIGNS[invite.design]?.type === (invite.type || 'fun') ? invite.design : 'classic'}`}>
       <Media invite={invite} onError={message => onStatus(message, true)} />
       <h1>{invite.title}</h1>
       <p className="description">{invite.description}</p>

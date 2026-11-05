@@ -2,6 +2,7 @@
 import secrets
 import time
 from db import DB
+from designs import valid_design
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS q_profiles(uid INTEGER PRIMARY KEY, full_name TEXT NOT NULL, phone_hash TEXT UNIQUE);
@@ -44,6 +45,10 @@ class InvitationDB(DB):
                 await c.execute('ALTER TABLE q_invites ADD COLUMN no_attempts INTEGER NOT NULL DEFAULT 0')
             if 'design' not in columns:
                 await c.execute("ALTER TABLE q_invites ADD COLUMN design TEXT NOT NULL DEFAULT 'classic'")
+            if 'type' not in columns:
+                await c.execute("ALTER TABLE q_invites ADD COLUMN type TEXT NOT NULL DEFAULT 'fun'")
+            if 'details' not in columns:
+                await c.execute("ALTER TABLE q_invites ADD COLUMN details TEXT NOT NULL DEFAULT '{}'")
             request_columns = {r[1] for r in await (await c.execute('PRAGMA table_info(q_sender_requests)')).fetchall()}
             if 'quantity' not in request_columns:
                 await c.execute('ALTER TABLE q_sender_requests ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1')
@@ -143,7 +148,7 @@ class InvitationDB(DB):
     async def publish(self, mid, uid, ttl):
         async with self.connect(True) as c:
             row = await (await c.execute('SELECT * FROM q_invites WHERE id=? AND sender=?',(mid,uid))).fetchone()
-            if not row or not row['description'].strip():
+            if not row or not row['description'].strip() or not valid_design(row['design'], row['type']):
                 return None
             if row['status']=='draft':
                 if not await self._can_publish(c,uid): return None
