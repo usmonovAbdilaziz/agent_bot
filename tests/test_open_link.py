@@ -58,3 +58,20 @@ async def test_legacy_rsvp_migration(tmp_path):
     row=await db.one('SELECT * FROM q_rsvps WHERE invite_id=1')
     assert row['telegram_user_id']==2 and row['guests']==3 and row['notice_status']=='pending'
     assert (await db.invite(1))['share_mode']=='single'
+
+async def test_default_limit_500_and_existing_reply(n,api):
+    item=await make_open(n); mid=item['id']
+    assert n.cfg.rsvp_max_responses==500
+    async with n.db.connect(True) as conn:
+        await conn.executemany('INSERT INTO q_rsvps(invite_id,telegram_user_id,attending,guests,responded_at,receiver_name,notice_status) VALUES(?,?,?,?,?,?,?)',
+            [(mid,uid,1,1,time.time(),f'Guest {uid}','suppressed') for uid in range(1000,1499)])
+    for uid in (2,3): await n.msg(uid,f'/start i_{item["token"]}')
+    path=f'/api/invites/{mid}/rsvp'
+    body={'attending':1,'guests':2}
+    status,result=await api('POST',path,uid=2,json=body)
+    assert status==200 and result['rsvp']['guests']==2
+    status,error=await api('POST',path,uid=3,json=body)
+    assert status==409 and 'chegaraga yetdi' in error['error']
+    status,repeat=await api('POST',path,uid=2,json={'attending':0,'guests':0})
+    assert status==200 and repeat['rsvp']==result['rsvp']
+    assert (await n.db.one('SELECT COUNT(*) AS total FROM q_rsvps WHERE invite_id=?',(mid,)))['total']==500
