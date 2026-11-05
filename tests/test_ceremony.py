@@ -24,7 +24,7 @@ async def fill_to_map(n,mid):
     await n.msg(1,'18:30')
     await n.msg(1,'Toshkent, <Bog‘>')
 
-async def finish(n,mid,skip=True):
+async def finish(n,mid,skip=True,mode="single"):
     if skip:
         await n.cb(1,f'q:cskip:{mid}')
         await n.cb(1,f'q:cskip:{mid}')
@@ -36,6 +36,9 @@ async def finish(n,mid,skip=True):
     assert any(button['text']=='O‘tkazib yuborish' for row in json.loads(n.sent(1)[-1]['reply_markup'])['inline_keyboard'] for button in row)
     await n.cb(1,f'q:clayout:{mid}:top')
     await n.cb(1,f'q:cdesign:{mid}:ceremony_elegant')
+    assert (await n.db.flow(1))['stage']=='c_share'
+    assert 'manzil va vaqtni' in n.sent(1)[-1]['text']
+    await n.cb(1,f'q:cshare:{mid}:{mode}')
     assert (await n.db.flow(1))['stage']=='c_preview'
 
 @pytest.mark.parametrize('skip',[False,True])

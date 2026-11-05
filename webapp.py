@@ -53,9 +53,10 @@ async def invite_for(request):
     try: mid=int(request.match_info['mid'])
     except ValueError: raise ApiProblem('Taklif topilmadi.',404)
     item=await app.db.invite(mid)
-    if not item or request['uid'] not in (item['sender'],item['receiver']):
+    permitted = item and (request['uid'] in (item['sender'],item['receiver']) or (item['type']=='ceremony' and item['share_mode']=='open' and await app.db.one('SELECT 1 FROM q_open_views WHERE invite_id=? AND telegram_user_id=?',(mid,request['uid']))))
+    if not permitted:
         raise ApiProblem('Taklif topilmadi.',404)
-    answered = item['type']=='ceremony' and request['uid']==item['receiver'] and await app.db.one('SELECT 1 FROM q_rsvps WHERE invite_id=?',(item['id'],))
+    answered = item['type']=='ceremony' and await app.db.one('SELECT 1 FROM q_rsvps WHERE invite_id=? AND telegram_user_id=?',(item['id'],request['uid']))
     if request['uid']!=item['sender'] and not answered and item['status']!='accepted' and (
             item['status']!='ready' or item['expires_at']<=time.time()):
         raise ApiProblem('Taklif muddati tugagan.',409)
@@ -68,10 +69,10 @@ async def detail(request):
         raise ApiProblem('Taklif ma’lumotlari noto‘g‘ri.',409)
     details['layout'] = {**details.get('layout', {}), 'text_position': details.get('layout', {}).get('text_position', 'bottom')}
     design = item['design'] if valid_design(item['design'], item['type']) else ('ceremony_elegant' if item['type']=='ceremony' else 'classic')
-    response = await request.app[BOT_APP].db.one('SELECT attending,guests,responded_at FROM q_rsvps WHERE invite_id=?',(item['id'],)) if item['type']=='ceremony' else None
+    response = await request.app[BOT_APP].db.one('SELECT attending,guests,responded_at FROM q_rsvps WHERE invite_id=? AND telegram_user_id=?',(item['id'],request['uid'])) if item['type']=='ceremony' else None
     return web.json_response({k:item[k] for k in ('id','title','description','media_kind','status')} | {
         'design':design,
-        'type':item['type'], 'details':details,
+        'type':item['type'], 'share_mode':item['share_mode'], 'details':details,
         'preview':request['uid']==item['sender'], 'rsvp':dict(response) if response else None})
 
 class BoundedBuffer(io.BytesIO):
@@ -125,6 +126,12 @@ async def accept(request):
 
 async def rsvp(request):
     app=request.app[BOT_APP]
+    now=time.monotonic()
+    app.rsvp_requests={uid:times for uid,times in app.rsvp_requests.items() if times and now-times[-1]<60}
+    times=app.rsvp_requests.setdefault(request['uid'],[])
+    times[:]=[t for t in times if now-t<60]
+    if len(times)>=app.cfg.rsvp_rate_limit: raise ApiProblem('So‘rovlar juda ko‘p. Bir daqiqadan so‘ng qayta urinib ko‘ring.',429)
+    times.append(now)
     try: payload=await request.json()
     except (ValueError,TypeError): raise ApiProblem('Javob formati noto‘g‘ri.',400)
     if not isinstance(payload,dict): raise ApiProblem('Javob formati noto‘g‘ri.',400)
@@ -135,13 +142,14 @@ async def rsvp(request):
     name=' '.join(filter(None,[person.first_name,person.last_name])) or 'Oluvchi'
     async with app.lock:
         item=await invite_for(request)
-        if item['receiver']!=request['uid']: raise ApiProblem('Faqat oluvchi javob beradi.',403)
+        if item['sender']==request['uid'] or (item['share_mode']=='single' and item['receiver']!=request['uid']): raise ApiProblem('Faqat oluvchi javob beradi.',403)
         if item['type']!='ceremony': raise ApiProblem('Bu taklifda RSVP mavjud emas.',409)
         async with request.app[PHOTO_LOCK]:
-            response=await app.db.rsvp(item['id'],request['uid'],attending,guests if attending else 0,name)
+            response=await app.db.rsvp(item['id'],request['uid'],attending,guests if attending else 0,name,app.cfg.rsvp_max_responses)
+            if response=='limit': raise ApiProblem('Bu taklif uchun javoblar soni chegaraga yetdi.',409)
             if response is None: raise ApiProblem('Javobni saqlab bo‘lmadi.',409)
             if item['media_kind']=='photo': request.app[PHOTO_CACHE].remove(item['file_id'])
-    await app.notify_rsvp(item['id'])
+    await app.notify_rsvp(item['id'],request['uid'])
     return web.json_response({'rsvp':response})
 
 @web.middleware

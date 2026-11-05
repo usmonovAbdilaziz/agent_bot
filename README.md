@@ -190,3 +190,9 @@ migratsiyalari eski versiya bilan mos bo‘lishi kerak. GitHub API limiti yoki
 tarmoq uzilishida keyingi tekshiruvda qayta uriniladi.
 # agent_bot
 # agent_bot
+
+### Ceremony ochiq havolasi
+
+Yangi ceremony uchun standart ochiq havola: bot rejim tanlashda havola egalariga manzil va vaqt ochiqligini ko‘rsatadi. Tasdiqlangandan keyin Telegram ulashish tugmasi mavjud. Shaxsiy rejim bitta oluvchiga biriktiriladi. `/guests` faqat senderning ceremony takliflari va sahifalangan RSVP ro‘yxatini ko‘rsatadi. Dastlabki 50 ta javobga alohida bildirishnoma yuboriladi; qolganlari ro‘yxatda ko‘rinadi.
+
+`RSVP_MAX_RESPONSES` (standart `500`) va `RSVP_RATE_LIMIT_PER_MINUTE` (standart `30`) sozlanadi. Tezlik chegarasi jarayon xotirasida saqlanadi. Mavjud takliflar migratsiyada shaxsiy qoladi va avvalgi RSVP oluvchiga bog‘lanadi.

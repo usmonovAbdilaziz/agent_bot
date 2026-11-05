@@ -17,3 +17,10 @@ Har bir sinov uchun qurilma modeli, OS va Telegram versiyasi, sana, natija va ke
 - [ ] **M4 — Xarita va taqvim:** haqiqiy Telegram klientida xarita va Google Calendar tugmalarini bosing. Kutilgan natija: ruxsat etilgan xarita ochiladi, taqvimda Toshkent vaqti va uch soatlik davomiylik to‘g‘ri chiqadi.
 - [ ] **M4 — Sender xabari:** haqiqiy alohida sender va receiver hisoblari bilan RSVP yuboring. Kutilgan natija: senderga oluvchining Telegram ismi, javobi, mehmonlar soni va taklif sarlavhasi yetib boradi.
 - [ ] **M4 — Mobil boshqaruv:** iOS va Android Telegramda stepper, klaviatura fokusi va pastki chekka bilan ishlashni tekshiring. Kutilgan natija: 1–10 oralig‘idagi sonni tanlash va javobni yuborish qulay, hech bir tugma tizim paneli ostida qolmaydi.
+
+## M4b — ochiq havola
+
+- [ ] Ikki haqiqiy Telegram hisobi bir ochiq havolani ochib, turli RSVP yuborsin; qayta ochganda har biri faqat o‘z javobini ko‘rsin.
+- [ ] Ceremony rejim tanlashdagi maxfiylik ogohlantirishi, shaxsiy rejim va Telegram share tugmasini qurilmada tekshiring.
+- [ ] Sender `/guests` orqali bir nechta taklifdan tanlasin, uzun ro‘yxatning oldingi/keyingi sahifalarini ko‘rsin; boshqa hisob kira olmasin.
+- [ ] Sender dastlabki 50 ta javobga alohida xabar olishini, 51-javob ro‘yxatda chiqib, alohida xabar yuborilmasligini tekshiring.

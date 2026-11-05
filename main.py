@@ -22,7 +22,7 @@ from invitation_store import InvitationDB, parse_details, valid_ceremony_details
 
 MAX_MEDIA = 20 * 1024 * 1024
 CEREMONY_LABELS = {'wedding':'To‘y', 'nikah':'Nikoh', 'beshik':'Beshik to‘y', 'sunnat':'Sunnat to‘y', 'fotiha':'Fotiha', 'birthday':'Tug‘ilgan kun', 'other':'Boshqa'}
-CEREMONY_STAGES = ('c_kind','c_title','c_date','c_time','c_address','c_map','c_program','c_note','c_media','c_layout','c_design','c_preview')
+CEREMONY_STAGES = ('c_kind','c_title','c_date','c_time','c_address','c_map','c_program','c_note','c_media','c_layout','c_design','c_share','c_preview')
 
 def select_photo(photos):
     suitable = [photo for photo in photos if photo.width >= 720]
@@ -49,6 +49,7 @@ class App:
         self.photo_cache = None
         self.photo_lock = asyncio.Lock()
         self.ready = False
+        self.rsvp_requests = {}
 
     async def admin(self):
         value = await self.db.setting('admin')
@@ -92,9 +93,9 @@ class App:
             await self.db.run('UPDATE q_accept_notices SET status=? WHERE invite_id=?',
                               ('sent' if sent else 'failed', mid))
 
-    async def notify_rsvp(self, mid):
+    async def notify_rsvp(self, mid, uid=None):
         async with self.notice_lock:
-            response=await self.db.one("SELECT * FROM q_rsvps WHERE invite_id=? AND notice_status='pending'",(mid,))
+            response=await self.db.one("SELECT rowid AS notice_id,* FROM q_rsvps WHERE invite_id=? AND notice_status='pending' AND (? IS NULL OR telegram_user_id=?) ORDER BY rowid LIMIT 1",(mid,uid,uid))
             if not response: return
             item=await self.db.invite(mid)
             decision='Kelaman' if response['attending'] else 'Kela olmayman'
@@ -104,7 +105,7 @@ class App:
             except (TelegramAPIError,OSError,TimeoutError) as exc:
                 logging.warning('RSVP xabari keyinroq yuboriladi: %s',type(exc).__name__)
                 return
-            await self.db.run('UPDATE q_rsvps SET notice_status=? WHERE invite_id=?',('sent' if sent else 'failed',mid))
+            await self.db.run('UPDATE q_rsvps SET notice_status=? WHERE rowid=?',('sent' if sent else 'failed',response['notice_id']))
 
     async def acceptance_notifications(self):
         while True:
@@ -112,9 +113,9 @@ class App:
                 notices = await self.db.all("SELECT invite_id FROM q_accept_notices WHERE status='pending' ORDER BY invite_id LIMIT 20")
                 for notice in notices:
                     await self.notify_acceptance(notice['invite_id'])
-                rsvps=await self.db.all("SELECT invite_id FROM q_rsvps WHERE notice_status='pending' ORDER BY invite_id LIMIT 20")
+                rsvps=await self.db.all("SELECT invite_id,telegram_user_id FROM q_rsvps WHERE notice_status='pending' ORDER BY invite_id LIMIT 20")
                 for response in rsvps:
-                    await self.notify_rsvp(response['invite_id'])
+                    await self.notify_rsvp(response['invite_id'],response['telegram_user_id'])
                 requests = await self.db.all("SELECT id FROM q_sender_requests WHERE (status='pending' AND admin_notified=0) OR (status!='pending' AND decision_notified=0) ORDER BY id LIMIT 20")
                 for request in requests:
                     await self.notify_sender_request(request['id'])
@@ -342,13 +343,14 @@ class App:
                 'c_time':'Vaqtni HH:MM formatida kiriting.', 'c_address':'Manzilni kiriting (1–300 belgi).',
                 'c_map':'Xarita HTTPS havolasini yuboring yoki o‘tkazib yuboring.', 'c_program':'Dasturni har bandni alohida qatorda yuboring yoki o‘tkazib yuboring.',
                 'c_note':'Qo‘shimcha matnni kiriting (1–500 belgi).', 'c_media':'Rasm yoki 60 soniyagacha video yuboring yoki o‘tkazib yuboring.',
-                'c_layout':'Matn qayerda joylashsin?', 'c_design':'Dizaynni tanlang.'}
+                'c_layout':'Matn qayerda joylashsin?', 'c_design':'Dizaynni tanlang.', 'c_share':'Havola rejimini tanlang. Ochiq havolani olgan har kim manzil va vaqtni ko‘radi.'}
         rows=[]
         if stage=='c_kind':
             choices=[(label,f'q:cevent:{mid}:{key}') for key,label in CEREMONY_LABELS.items()]
             rows.extend(choices[i:i+2] for i in range(0,len(choices),2))
         elif stage=='c_layout': rows.extend([[('Yuqorida',f'q:clayout:{mid}:top'),('O‘rtada',f'q:clayout:{mid}:center')],[('Pastda',f'q:clayout:{mid}:bottom'),('O‘tkazib yuborish',f'q:clayout:{mid}:bottom')]])
         elif stage=='c_design': rows.append([('💍 Nafis',f'q:cdesign:{mid}:ceremony_elegant')])
+        elif stage=='c_share': rows.extend([[('🌐 Ochiq havola (standart)',f'q:cshare:{mid}:open')],[('🔒 Shaxsiy havola',f'q:cshare:{mid}:single')]])
         elif stage=='c_preview': return await self.preview(uid,item)
         if stage in ('c_map','c_program','c_media'): rows.append([('O‘tkazib yuborish',f'q:cskip:{mid}')])
         rows.append([('Orqaga',f'q:cback:{mid}'),('Bekor qilish',f'q:ccancel:{mid}')])
@@ -365,8 +367,38 @@ class App:
         return await self.send(uid,'Qoralama bekor qilindi.',reply_markup=kb([('Yangi taklif','q:new')]))
 
     async def show_link(self, uid, item):
-        return await self.send(uid,f'<b>Taklif havolasi tayyor</b>\nhttps://t.me/{self.username}?start=i_{item["token"]}\n\n'
-            'Havolani bitta oluvchiga yuboring.',reply_markup=kb([('Yangi taklif','q:home' if uid==await self.admin() else 'q:new')]))
+        link=f'https://t.me/{self.username}?start=i_{item["token"]}'
+        rows=[]
+        if item['share_mode']=='open':
+            rows.append([InlineKeyboardButton(text='Telegram orqali ulashish',url='https://t.me/share/url?'+urlencode({'url':link}))])
+            text='Havolani ko‘p mehmonga yuborishingiz mumkin. /guests orqali javoblarni ko‘ring.'
+        else: text='Havolani bitta oluvchiga yuboring.'
+        rows.append([InlineKeyboardButton(text='Yangi taklif',callback_data='q:home' if uid==await self.admin() else 'q:new')])
+        return await self.send(uid,f'<b>Taklif havolasi tayyor</b>\n{link}\n\n{text}',reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+    async def guests(self, uid, mid=None, page=0):
+        if mid is None:
+            items=await self.db.all("SELECT id,title FROM q_invites WHERE sender=? AND type='ceremony' AND status!='draft' ORDER BY id DESC",(uid,))
+            if not items: return await self.send(uid,'Marosim takliflari topilmadi.')
+            if len(items)==1: return await self.guests(uid,items[0]['id'])
+            # Limit each selection page so Telegram message and keyboard limits are respected.
+            page=max(0,page); chunk=items[page*15:(page+1)*15]
+            rows=[[(f"#{x['id']} {x['title'][:45]}",f"q:guests:{x['id']}:0")] for x in chunk]
+            nav=[]
+            if page: nav.append(('⬅️',f'q:glist:{page-1}'))
+            if (page+1)*15<len(items): nav.append(('➡️',f'q:glist:{page+1}'))
+            if nav: rows.append(nav)
+            return await self.send(uid,'Taklifni tanlang:',reply_markup=kb(*rows))
+        item=await self.db.one("SELECT * FROM q_invites WHERE id=? AND sender=? AND type='ceremony' AND status!='draft'",(mid,uid))
+        if not item: return await self.send(uid,'Taklif topilmadi.')
+        stats=await self.db.one('SELECT COALESCE(SUM(attending),0) yes,COALESCE(SUM(CASE WHEN attending=1 THEN guests ELSE 0 END),0) total,COALESCE(SUM(CASE WHEN attending=0 THEN 1 ELSE 0 END),0) no FROM q_rsvps WHERE invite_id=?',(mid,))
+        responses=await self.db.all('SELECT receiver_name,attending,guests FROM q_rsvps WHERE invite_id=? ORDER BY responded_at,rowid LIMIT 2 OFFSET ?',(mid,max(0,page)*2))
+        lines=[f"{esc(x['receiver_name'])}: {'Kelaman' if x['attending'] else 'Kela olmayman'} — {x['guests']} kishi" for x in responses]
+        text=f"<b>{esc(item['title'])}</b>\nKelaman: {stats['yes']} (jami {stats['total']} kishi)\nKela olmayman: {stats['no']}\n\n"+'\n'.join(lines)
+        nav=[]
+        if page>0: nav.append(('⬅️',f'q:guests:{mid}:{page-1}'))
+        if (page+1)*2 < stats['yes']+stats['no']: nav.append(('➡️',f'q:guests:{mid}:{page+1}'))
+        return await self.send(uid,text,reply_markup=kb(nav) if nav else None)
 
     async def deliver_link(self, q, item):
         if not item['link_sent']:
@@ -411,6 +443,7 @@ class App:
             flow = await self.db.flow(uid)
             if flow and await self.is_sender(uid): return await self.prompt(uid)
             return await self.home(uid)
+        if cmd=='/guests': return await self.guests(uid)
         if m.contact: return await self.contact(m)
         if cmd=='/admin' and uid==await self.admin(): return await self.home(uid)
         if cmd=='/taklif':
@@ -490,6 +523,8 @@ class App:
         parts=(q.data or '').split(':')
         if len(parts)<2 or parts[0]!='q': return  # Old menus have no active handlers.
         action=parts[1]
+        if action=='guests' and len(parts)==4 and parts[2].isdigit() and parts[3].isdigit(): return await self.guests(uid,int(parts[2]),int(parts[3]))
+        if action=='glist' and len(parts)==3 and parts[2].isdigit(): return await self.guests(uid,page=int(parts[2]))
         if action=='request': return await self.request_sender(uid)
         if action=='quota' and len(parts)==3 and parts[2] in ('1','10','30'):
             row=await self.db.sender_request(uid,int(parts[2]))
@@ -547,14 +582,14 @@ class App:
         if action=='new':
             await self.db.begin(uid)
             return await self.prompt(uid)
-        if action in ('ctype','cevent','clayout','cdesign') and len(parts)==4 and parts[2].isdigit():
+        if action in ('ctype','cevent','clayout','cdesign','cshare') and len(parts)==4 and parts[2].isdigit():
             mid=int(parts[2]); item=await self.db.invite(mid); flow=await self.db.flow(uid)
             if not item or item['sender']!=uid or item['status']!='draft' or not flow or flow['invite_id']!=mid: return
             choice=parts[3]
             if action=='ctype' and flow['stage']=='type' and choice in ('fun','ceremony'):
                 if item['type']!=choice:
-                    await self.db.run('UPDATE q_invites SET type=?,design=?,details=?,description=? WHERE id=?',
-                        (choice,'ceremony_elegant' if choice=='ceremony' else 'classic','{}','',mid))
+                    await self.db.run('UPDATE q_invites SET type=?,design=?,details=?,description=?,share_mode=? WHERE id=?',
+                        (choice,'ceremony_elegant' if choice=='ceremony' else 'classic','{}','', 'open' if choice=='ceremony' else 'single',mid))
                 elif choice=='ceremony' and not valid_design(item['design'],'ceremony'):
                     await self.db.run("UPDATE q_invites SET design='ceremony_elegant' WHERE id=?",(mid,))
                 await self.db.stage(uid,'c_kind' if choice=='ceremony' else 'media',mid)
@@ -566,6 +601,9 @@ class App:
                 await self.db.stage(uid,'c_design',mid)
             elif item['type']=='ceremony' and action=='cdesign' and flow['stage']=='c_design' and valid_design(choice,'ceremony'):
                 await self.db.run('UPDATE q_invites SET design=? WHERE id=?',(choice,mid))
+                await self.db.stage(uid,'c_share',mid)
+            elif item['type']=='ceremony' and action=='cshare' and flow['stage']=='c_share' and choice in ('open','single'):
+                await self.db.run('UPDATE q_invites SET share_mode=? WHERE id=?',(choice,mid))
                 await self.db.stage(uid,'c_preview',mid)
             else: return
             return await self.prompt(uid)
@@ -674,7 +712,7 @@ async def main():
         notices = asyncio.create_task(app.acceptance_notifications())
         try:
             await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
-            await bot.set_my_commands([BotCommand(command='start',description='Boshlash yoki davom etish'),BotCommand(command='taklif',description='Taklif yuborish')])
+            await bot.set_my_commands([BotCommand(command='start',description='Boshlash yoki davom etish'),BotCommand(command='taklif',description='Taklif yuborish'),BotCommand(command='guests',description='Mehmonlar ro‘yxati')])
             await bot.delete_webhook(drop_pending_updates=False)
             app.ready=True
             logging.warning('Minimal taklif boti ishga tushdi: @%s',me.username)

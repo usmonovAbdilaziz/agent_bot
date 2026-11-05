@@ -17,6 +17,8 @@ async def n(h):
     h.db=InvitationDB(h.db.path)
     await h.db.init()
     h.cfg.webapp_url='https://mini.example.test'
+    h.cfg.rsvp_rate_limit=30
+    h.cfg.rsvp_max_responses=500
     h.app=App(h.bot,h.db,h.cfg,'test_agent_bot')
     h.dp=dispatcher(h.app)
     await h.msg(1,'/start')

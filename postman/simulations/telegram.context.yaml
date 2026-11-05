@@ -99,6 +99,13 @@ assumptions:
     verification: 2026-11-02 18:32 dan keyin 2 user, 1 used link, 1 delivered photo, 1 open session va 2 yetkazilgan notice kuzatildi. Yangilangan bot ishlamoqda. Barcha 33 lokal test o'tdi; jonli ko'p hisobli sinovning qolgan qismi hali tasdiqlanmagan.
     source: TEST_REPORT.md; README.md
     updated_at: '2026-11-02'
+  - id: m4b-telegram-guest-list
+    status: supported
+    claim: Local Telegram mock records sender guest-list messages and RSVP notifications; the simulated 500 notification is retried.
+    reason: The real bot and SQLite run against the repository-owned Telegram HTTP stand-in, not live Telegram.
+    verification: Postman simulation request events showed sendMessage failure and retry; tests inspect notification and guest-list messages. Live delivery and mobile sharing remain unverified.
+    source: tests/test_postman.py::test_ceremony_rsvp_with_postman_notification_retry; postman/mocks/telegram/default.js
+    updated_at: '2026-11-05'
 fingerprints:
   - id: local-release-1
     date: '2026-11-02'

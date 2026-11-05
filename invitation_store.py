@@ -110,6 +110,22 @@ class InvitationDB(DB):
                 await c.execute("ALTER TABLE q_invites ADD COLUMN type TEXT NOT NULL DEFAULT 'fun'")
             if 'details' not in columns:
                 await c.execute("ALTER TABLE q_invites ADD COLUMN details TEXT NOT NULL DEFAULT '{}'")
+            if 'share_mode' not in columns:
+                await c.execute("ALTER TABLE q_invites ADD COLUMN share_mode TEXT NOT NULL DEFAULT 'single' CHECK(share_mode IN ('single','open'))")
+            rsvp_columns = {r[1] for r in await (await c.execute('PRAGMA table_info(q_rsvps)')).fetchall()}
+            if 'telegram_user_id' not in rsvp_columns:
+                await c.execute('ALTER TABLE q_rsvps RENAME TO q_rsvps_old')
+                await c.execute("""CREATE TABLE q_rsvps (
+                    invite_id INTEGER NOT NULL REFERENCES q_invites(id), telegram_user_id INTEGER,
+                    attending INTEGER NOT NULL CHECK(attending IN (0,1)),
+                    guests INTEGER NOT NULL CHECK(guests BETWEEN 0 AND 10), responded_at REAL NOT NULL,
+                    receiver_name TEXT NOT NULL, notice_status TEXT NOT NULL DEFAULT 'pending',
+                    UNIQUE(invite_id,telegram_user_id))""")
+                await c.execute("""INSERT INTO q_rsvps SELECT r.invite_id,i.receiver,r.attending,r.guests,
+                    r.responded_at,r.receiver_name,r.notice_status FROM q_rsvps_old r
+                    LEFT JOIN q_invites i ON i.id=r.invite_id""")
+                await c.execute('DROP TABLE q_rsvps_old')
+            await c.execute('CREATE TABLE IF NOT EXISTS q_open_views(invite_id INTEGER NOT NULL, telegram_user_id INTEGER NOT NULL, PRIMARY KEY(invite_id,telegram_user_id))')
             request_columns = {r[1] for r in await (await c.execute('PRAGMA table_info(q_sender_requests)')).fetchall()}
             if 'quantity' not in request_columns:
                 await c.execute('ALTER TABLE q_sender_requests ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1')
@@ -243,9 +259,12 @@ class InvitationDB(DB):
             row = await (await c.execute('SELECT * FROM q_invites WHERE token=?',(token,))).fetchone()
             if not row or row['status']!='ready' or row['expires_at']<=time.time():
                 return None
-            if row['sender']==uid or row['receiver'] not in (None,uid):
-                return None
-            await c.execute('UPDATE q_invites SET receiver=? WHERE id=? AND receiver IS NULL',(uid,row['id']))
+            if row['sender']==uid: return None
+            if row['share_mode']=='open' and row['type']=='ceremony':
+                await c.execute('INSERT OR IGNORE INTO q_open_views VALUES(?,?)',(row['id'],uid))
+            else:
+                if row['receiver'] not in (None,uid): return None
+                await c.execute('UPDATE q_invites SET receiver=? WHERE id=? AND receiver IS NULL',(uid,row['id']))
             return row['id']
 
     async def decide_suggestion(self, suggestion_id, admin_uid, approve):
@@ -271,15 +290,19 @@ class InvitationDB(DB):
             await c.execute('INSERT OR IGNORE INTO q_accept_notices(invite_id) VALUES(?)',(mid,))
             return True
 
-    async def rsvp(self, mid, uid, attending, guests, receiver_name):
+    async def rsvp(self, mid, uid, attending, guests, receiver_name, max_responses=500):
         if type(attending) is not int or attending not in (0,1) or type(guests) is not int or (attending and not 1<=guests<=10) or (not attending and guests!=0): return None
         async with self.connect(True) as c:
-            invite=await (await c.execute('SELECT * FROM q_invites WHERE id=? AND receiver=?',(mid,uid))).fetchone()
-            if not invite or invite['type']!='ceremony' or invite['status']!='ready': return None
-            previous=await (await c.execute('SELECT attending,guests,responded_at FROM q_rsvps WHERE invite_id=?',(mid,))).fetchone()
+            invite=await (await c.execute('SELECT * FROM q_invites WHERE id=?',(mid,))).fetchone()
+            if not invite or invite['type']!='ceremony' or invite['status']!='ready' or uid==invite['sender']: return None
+            if invite['share_mode']=='single' and invite['receiver']!=uid: return None
+            if invite['share_mode']=='open' and not await (await c.execute('SELECT 1 FROM q_open_views WHERE invite_id=? AND telegram_user_id=?',(mid,uid))).fetchone(): return None
+            previous=await (await c.execute('SELECT attending,guests,responded_at FROM q_rsvps WHERE invite_id=? AND telegram_user_id=?',(mid,uid))).fetchone()
             if previous: return dict(previous)
             if invite['expires_at']<=time.time(): return None
-            await c.execute('INSERT INTO q_rsvps(invite_id,attending,guests,responded_at,receiver_name) VALUES(?,?,?,?,?)',
-                            (mid,attending,guests,time.time(),receiver_name[:200]))
-            row=await (await c.execute('SELECT attending,guests,responded_at FROM q_rsvps WHERE invite_id=?',(mid,))).fetchone()
+            count=(await (await c.execute('SELECT count(*) FROM q_rsvps WHERE invite_id=?',(mid,))).fetchone())[0]
+            if count>=max_responses: return 'limit'
+            await c.execute('INSERT INTO q_rsvps(invite_id,telegram_user_id,attending,guests,responded_at,receiver_name,notice_status) VALUES(?,?,?,?,?,?,?)',
+                            (mid,uid,attending,guests,time.time(),receiver_name[:200], 'pending' if count<50 else 'suppressed'))
+            row=await (await c.execute('SELECT attending,guests,responded_at FROM q_rsvps WHERE invite_id=? AND telegram_user_id=?',(mid,uid))).fetchone()
             return dict(row)

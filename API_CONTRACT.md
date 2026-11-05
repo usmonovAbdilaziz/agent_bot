@@ -73,3 +73,9 @@ Tailscale Funnel launcher supplies the HTTPS URL each run. Bot deep links remain
 stable; reopening /start before acceptance generates a button with current tunnel URL.
 Sources: https://core.telegram.org/bots/webapps ; https://core.telegram.org/bots/api#getfile
 Orbit sendVideo discovery reviewed; official docs are authoritative for Mini App launch.
+
+### M4b: ochiq havola va RSVP
+
+`GET /api/invites/{id}` javobida `share_mode` (`single` yoki `open`) bor. Yangi ceremony uchun standart `open`, fun uchun `single`; eski takliflar `single` qoladi. Ochiq taklifni ko‘rish uchun foydalanuvchi avval botdagi tokenli havolani ochishi, barcha API so‘rovlarida esa haqiqiy Telegram `initData` yuborishi kerak. Sender preview javoblarni oshkor qilmaydi. `rsvp` faqat joriy foydalanuvchining javobi.
+
+`POST /api/invites/{id}/rsvp` har bir `(invite_id, telegram_user_id)` uchun dastlabki javobni saqlaydi va keyingi so‘rovlarda o‘sha javobni qaytaradi. Chegaraga yetgan yangi javob 409; foydalanuvchining so‘rov tezligi oshsa 429 va tushunarli `error` qaytadi. Standart limit 500, tezlik 30 so‘rov/daqiqa; mos ravishda `RSVP_MAX_RESPONSES` va `RSVP_RATE_LIMIT_PER_MINUTE` bilan sozlanadi. Tezlik chegarasi jarayon xotirasida bo‘lib, qayta ishga tushganda tiklanadi. Dastlabki 50 ta RSVP uchun alohida sender xabari outbox orqali yuboriladi; keyingilari faqat `/guests` ro‘yxatida ko‘rinadi.

@@ -60,7 +60,7 @@ async def test_full_main_starts_webapp_menu_and_polling(tmp_path,monkeypatch):
             menu=next(c for c in calls if c['method']=='setChatMenuButton')
             assert json.loads(menu['body']['menu_button'])['type']=='commands'
             commands=next(c for c in calls if c['method']=='setMyCommands')
-            assert [c['command'] for c in json.loads(commands['body']['commands'])]==['start','taklif']
+            assert [c['command'] for c in json.loads(commands['body']['commands'])]==['start','taklif','guests']
             async with http.get(f'http://127.0.0.1:{port}/') as response:
                 assert response.status==200 and 'Siz uchun taklif' in await response.text()
             async with http.get(f'http://127.0.0.1:{port}/assets/app.js') as response:
@@ -274,7 +274,8 @@ async def test_ceremony_rsvp_with_postman_notification_retry(tmp_path):
     db=InvitationDB(tmp_path/'rsvp.sqlite3'); await db.init()
     details={'event_kind':'nikah','date':'01.01.2099','time':'10:00','address':'Toshkent','map_url':'','program':[],'note':'Xush kelibsiz','layout':{'text_position':'bottom'}}
     await db.run("INSERT INTO q_invites(id,sender,receiver,title,description,created_at,expires_at,status,type,design,details) VALUES(1,1,2,'Bayram','Xush kelibsiz',?,?, 'ready','ceremony','ceremony_elegant',?)",(time.time(),time.time()+3600,json.dumps(details)))
-    cfg=Config(token,'998900000000',webapp_url='https://mini.example.test')
+    from config import Config as CurrentConfig
+    cfg=CurrentConfig(token,'998900000000',webapp_url='https://mini.example.test')
     app=MinimalApp(bot,db,cfg,'test_agent_bot'); runner=web.AppRunner(create_web_app(app)); await runner.setup()
     site=web.TCPSite(runner,'127.0.0.1',0); await site.start(); port=site._server.sockets[0].getsockname()[1]
     try:
@@ -287,6 +288,9 @@ async def test_ceremony_rsvp_with_postman_notification_retry(tmp_path):
             assert (await db.one('SELECT * FROM q_rsvps WHERE invite_id=1'))['notice_status']=='pending'
             await app.notify_rsvp(1)
             assert (await db.one('SELECT * FROM q_rsvps WHERE invite_id=1'))['notice_status']=='sent'
+            await app.guests(1,1)
+            async with client.get(URL+'/_test/guest-messages') as response: guest_messages=await response.json()
+            assert len(guest_messages)==1 and 'jami 3 kishi' in guest_messages[0]['body']['text']
             async with client.get(URL+'/_test/rsvp-notices') as response: notices=await response.json()
             assert len(notices)==2 and all('Ism2' in x['body']['text'] and 'Mehmonlar soni: 3' in x['body']['text'] for x in notices)
             async with client.post(address,headers=headers,json={'attending':0,'guests':0}) as response:

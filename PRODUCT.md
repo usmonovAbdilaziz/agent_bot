@@ -32,3 +32,7 @@ Telegram /startdan avtomatik browser ochmaydi: bitta Taklifni ochish tugmasi ker
 ## Evidence on Hand
 Yangi oqim uchun real Dispatcher/lokal HTTP testlar; Postman mocki; Playwright
 fixture sinovlari. Jonli Telegramdagi yakuniy tekshiruv lokal testlardan alohida.
+
+## Ochiq ceremony havolasi
+
+Ceremony yaratishda ochiq (standart) yoki shaxsiy havola tanlanadi. Ochiq havolani olgan har kim marosim vaqti va manzilini ko‘rishi mumkin; har bir Telegram foydalanuvchisining birinchi RSVP javobi alohida saqlanadi. Sender `/guests` orqali faqat o‘z takliflarini tanlab, javoblar va mehmonlar sonini sahifalab ko‘radi. Dastlabki 50 javobga alohida xabar yuboriladi, keyingi javoblar ro‘yxatda ko‘rinadi. Fun havolasi shaxsiy va bir martalik bo‘lib qoladi.
