@@ -5,7 +5,7 @@ import hashlib
 import argparse
 
 ROOT=Path(__file__).resolve().parent
-FILES=['config.py','invitation_store.py','web_common.py','legacy_bot.py','legacy_webapp.py','API_CONTRACT.md','PRODUCT.md','DESIGN.md','main.py','db.py','run.py','launch.py','webapp.py','package.py','requirements.txt','requirements-dev.txt','package.json','package-lock.json','vite.config.js',
+FILES=['designs.py','config.py','invitation_store.py','web_common.py','legacy_bot.py','legacy_webapp.py','API_CONTRACT.md','PRODUCT.md','DESIGN.md','main.py','db.py','run.py','launch.py','webapp.py','package.py','requirements.txt','requirements-dev.txt','package.json','package-lock.json','vite.config.js',
        '.env.example','.gitignore','README.md','TEST_REPORT.md','pytest.ini','start.command','start.bat',
        'start_windows.ps1','setup_config.py','WINDOWS_README.txt']
 

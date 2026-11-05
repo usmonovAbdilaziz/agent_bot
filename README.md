@@ -82,13 +82,20 @@ Bot tokeni o‘zgarsa sender telefonini qayta tasdiqlash/tanlash kerak bo‘ladi
    60 soniyagacha, fayl 20 MiB gacha. Media kerak bo‘lmasa **Rasm/videosiz davom etish**.
 2. **Ism**: Telegram full name avtomatik chiqadi. **Shu ismni qoldirish** yoki
    o‘zingiz yangi ism/matn yozing (1–120 belgi).
-3. **Tavsif**: taklif matnini yuboring (1–2000 belgi).
+3. **Tavsif**: taklif matnini yuboring (1–2000 belgi); keyin matnni yuqori, o‘rta yoki pastga joylashtiring yoki standart pastki joyni tanlang.
 4. **Ko‘rib chiqish**: media va matn chatda chiqadi. **Ko‘rinishini ochish** receiver
    sahifasining aynan o‘zini ko‘rsatadi. **Dizaynni tanlash** orqali Sodda, Romantik,
-   Quvnoq yoki Nafis ko‘rinishni tanlang va preview orqali tekshiring. **Tahrirlash**
+   Quvnoq, Nafis, Tug‘ilgan kun, Neon yoki Yangi yil ko‘rinishini tanlang va preview orqali tekshiring. **Tahrirlash**
    bosqichlarni qayta ochadi.
 5. **Tasdiqlash**: receiver uchun bitta bir martalik havola yaratadi. Adminning
    ikkinchi tasdig‘i yo‘q. Takror bosish yangi havola yaratmaydi.
+
+Yangi qoralamada avval **Ko‘ngilochar** yoki **To‘y va marosimlar** tanlanadi.
+Marosim oqimida tur, sarlavha, sana, vaqt, manzil, ixtiyoriy xarita va dastur,
+qo‘shimcha matn, ixtiyoriy media, matn joyi va Nafis dizayn kiritiladi. Sana
+Toshkent sanasiga nisbatan o‘tgan bo‘lmasligi kerak. Mini Appda marosim ma’lumotlari,
+xarita va taqvim havolalari hamda bir martalik RSVP ko‘rinadi. Kelmaslik uchun
+mehmonlar soni 0 saqlanadi; kelishda 1–10 tanlanadi. Havola bitta oluvchiga bog‘lanadi.
 
 Qoralama va bosqich SQLite bazasida saqlanadi. Uzilishdan keyin `/start` bilan
 davom eting. `/cancel` tugallanmagan qoralamani bekor qiladi. Bu yordamchi buyruq
@@ -101,10 +108,11 @@ bosganda havola unga birikadi. Bot faqat **Taklifni ochish** tugmasini yuboradi.
 Telegram `/start` javobidan Mini Appni avtomatik ochishga ruxsat bermaydi:
 foydalanuvchi bu tugmani bir marta bosadi.
 
-Sahifada dumaloq media (agar bor bo‘lsa), ism, tavsif, **Ha / Yo‘q** turadi.
+Sahifada rasm/video butun ekran foni bo‘ladi; media bo‘lmasa dizayn gradienti ko‘rinadi. Uning ustida ism, tavsif va **Ha / Yo‘q** turadi.
 Video ovozsiz o‘ynaydi; **Ovozni yoqish** bilan ovoz yoqiladi. Yo‘q tugmasi
-sichqoncha/teginish/klaviaturadan qochadi. Har 10 urinishda 😡 stiker ko‘rinishidagi
-reaksiya vaqtincha chiqadi va urinishlar davom etadi. Telegramning yopish tugmasi
+sichqoncha/teginish/klaviaturadan qochadi, Ha esa kattalashadi. Beshinchi urinishdan
+iboralar, har o‘ninchi urinishda vaqtinchalik 😡 va yigirmanchi urinishdan kuchliroq
+reaksiya ko‘rinadi. Reduced motion sozlamasida titrash o‘chiriladi. Telegramning yopish tugmasi
 mavjud; rad etishga majburlovchi server amali yo‘q.
 
 **Ha** faqat server javobni saqlagach bayram animatsiyasini chiqaradi va 2.8 soniyadan
@@ -182,3 +190,11 @@ migratsiyalari eski versiya bilan mos bo‘lishi kerak. GitHub API limiti yoki
 tarmoq uzilishida keyingi tekshiruvda qayta uriniladi.
 # agent_bot
 # agent_bot
+
+### Ceremony ochiq havolasi
+
+Yangi ceremony uchun standart ochiq havola: bot rejim tanlashda havola egalariga manzil va vaqt ochiqligini ko‘rsatadi. Tasdiqlangandan keyin Telegram ulashish tugmasi mavjud. Shaxsiy rejim bitta oluvchiga biriktiriladi. `/guests` faqat senderning ceremony takliflari va sahifalangan RSVP ro‘yxatini ko‘rsatadi. Dastlabki 50 ta javobga alohida bildirishnoma yuboriladi; qolganlari ro‘yxatda ko‘rinadi.
+
+`RSVP_MAX_RESPONSES` (standart `500`) va `RSVP_RATE_LIMIT_PER_MINUTE` (standart `30`) sozlanadi. Tezlik chegarasi jarayon xotirasida saqlanadi. Mavjud takliflar migratsiyada shaxsiy qoladi va avvalgi RSVP oluvchiga bog‘lanadi.
+
+Ceremony dizaynlari: `atlas`, `nafis`, `gold`, `envelope`, `ticket`. Ilgari saqlangan `ceremony_elegant` qiymati `nafis`ga migratsiya qilinadi. Aktivlar lokal CSS, tizim serif shriftlari va mavjud rasm/video fonidan iborat; tashqi shrift yoki CDN ishlatilmaydi.

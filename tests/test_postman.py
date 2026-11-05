@@ -60,7 +60,7 @@ async def test_full_main_starts_webapp_menu_and_polling(tmp_path,monkeypatch):
             menu=next(c for c in calls if c['method']=='setChatMenuButton')
             assert json.loads(menu['body']['menu_button'])['type']=='commands'
             commands=next(c for c in calls if c['method']=='setMyCommands')
-            assert [c['command'] for c in json.loads(commands['body']['commands'])]==['start','taklif']
+            assert [c['command'] for c in json.loads(commands['body']['commands'])]==['start','taklif','guests']
             async with http.get(f'http://127.0.0.1:{port}/') as response:
                 assert response.status==200 and 'Siz uchun taklif' in await response.text()
             async with http.get(f'http://127.0.0.1:{port}/assets/app.js') as response:
@@ -162,9 +162,11 @@ async def test_minimal_video_invitation_through_postman(tmp_path,notice_error):
             await update(1,'/start')
             await update(1,contact={'phone_number':'+998900000000','first_name':'Admin','user_id':1})
             await update(1,callback='q:self')
+            await update(1,callback='q:ctype:1:fun')
             await update(1,video={'file_id':'video_id','file_unique_id':'unique','duration':60,'width':200,'height':200,'file_size':1024,'mime_type':'video/mp4'})
             await update(1,callback='q:name:1')
             await update(1,'Postman orqali video taklif')
+            await update(1,callback='q:layout:1:bottom')
             await update(1,callback='q:confirm:1')
             item=await db.invite(1)
             assert item['token'] and item['link_sent'] and item['title']=='Sinov Sender'
@@ -224,9 +226,11 @@ async def test_minimal_video_invitation_through_postman(tmp_path,notice_error):
                 assert await app.is_sender(2)
                 await update(2,'/start')
                 mid=(await db.flow(2))['invite_id']
+                await update(2,callback=f'q:ctype:{mid}:fun')
                 await update(2,callback=f'q:skip:{mid}')
                 await update(2,callback=f'q:name:{mid}')
                 await update(2,'Ruxsat bilan yaratilgan taklif')
+                await update(2,callback=f'q:layout:{mid}:bottom')
                 await update(2,callback=f'q:confirm:{mid}')
                 assert (await db.invite(mid))['token'] and not await app.is_sender(2)
                 await update(1,callback=f'q:approve:{request["id"]}')
@@ -235,9 +239,11 @@ async def test_minimal_video_invitation_through_postman(tmp_path,notice_error):
                 assert len(await db.all('SELECT * FROM q_invites WHERE sender=2'))==1
                 await update(1,callback='q:self')
                 fresh=(await db.flow(1))['invite_id']
+                await update(1,callback=f'q:ctype:{fresh}:fun')
                 await update(1,callback=f'q:skip:{fresh}')
                 await update(1,callback=f'q:name:{fresh}')
                 await update(1,'Avvalgi receiverga yangi taklif')
+                await update(1,callback=f'q:layout:{fresh}:bottom')
                 await update(1,callback=f'q:confirm:{fresh}')
                 invitation=await db.invite(fresh)
                 await update(2,f'/start i_{invitation["token"]}')
@@ -254,5 +260,40 @@ async def test_minimal_video_invitation_through_postman(tmp_path,notice_error):
                 assert any(c['method']=='sendMessage' and str(c['body'].get('chat_id'))=='1' and 'Sender bo‘lish so‘rovi' in c['body'].get('text','') for c in flow_calls)
                 assert any(c['method']=='sendMessage' and str(c['body'].get('chat_id'))=='2' and 'Admin 1 ta taklif' in c['body'].get('text','') for c in flow_calls)
                 assert any(c['method']=='sendMessage' and str(c['body'].get('chat_id'))=='1' and 'Yangi g‘oya' in c['body'].get('text','') for c in flow_calls)
+    finally:
+        await runner.cleanup()
+
+async def test_ceremony_rsvp_with_postman_notification_retry(tmp_path):
+    from invitation_store import InvitationDB
+    from main import App as MinimalApp
+    from webapp import create_web_app
+    from aiohttp import web
+    from test_webapp import signed
+    token='123456:TEST_ONLY_NOT_A_REAL_TOKEN'
+    bot=Bot(token,session=AiohttpSession(api=TelegramAPIServer.from_base(URL)),default=DefaultBotProperties(parse_mode='HTML'))
+    db=InvitationDB(tmp_path/'rsvp.sqlite3'); await db.init()
+    details={'event_kind':'nikah','date':'01.01.2099','time':'10:00','address':'Toshkent','map_url':'','program':[],'note':'Xush kelibsiz','layout':{'text_position':'bottom'}}
+    await db.run("INSERT INTO q_invites(id,sender,receiver,title,description,created_at,expires_at,status,type,design,details) VALUES(1,1,2,'Bayram','Xush kelibsiz',?,?, 'ready','ceremony','ceremony_elegant',?)",(time.time(),time.time()+3600,json.dumps(details)))
+    from config import Config as CurrentConfig
+    cfg=CurrentConfig(token,'998900000000',webapp_url='https://mini.example.test')
+    app=MinimalApp(bot,db,cfg,'test_agent_bot'); runner=web.AppRunner(create_web_app(app)); await runner.setup()
+    site=web.TCPSite(runner,'127.0.0.1',0); await site.start(); port=site._server.sockets[0].getsockname()[1]
+    try:
+        async with bot, aiohttp.ClientSession() as client:
+            async with client.post(URL+'/_test/reset',json={}) as response: assert response.status==200
+            async with client.post(URL+'/_test/fail-next',json={'method':'sendMessage','chat_id':1,'code':500}) as response: assert response.status==200
+            address=f'http://127.0.0.1:{port}/api/invites/1/rsvp'; headers={'X-Telegram-Init-Data':signed(token,2)}
+            async with client.post(address,headers=headers,json={'attending':1,'guests':3}) as response:
+                assert response.status==200 and (await response.json())['rsvp']['guests']==3
+            assert (await db.one('SELECT * FROM q_rsvps WHERE invite_id=1'))['notice_status']=='pending'
+            await app.notify_rsvp(1)
+            assert (await db.one('SELECT * FROM q_rsvps WHERE invite_id=1'))['notice_status']=='sent'
+            await app.guests(1,1)
+            async with client.get(URL+'/_test/guest-messages') as response: guest_messages=await response.json()
+            assert len(guest_messages)==1 and 'jami 3 kishi' in guest_messages[0]['body']['text']
+            async with client.get(URL+'/_test/rsvp-notices') as response: notices=await response.json()
+            assert len(notices)==2 and all('Ism2' in x['body']['text'] and 'Mehmonlar soni: 3' in x['body']['text'] for x in notices)
+            async with client.post(address,headers=headers,json={'attending':0,'guests':0}) as response:
+                assert response.status==200 and (await response.json())['rsvp']['guests']==3
     finally:
         await runner.cleanup()

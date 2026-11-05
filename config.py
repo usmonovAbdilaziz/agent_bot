@@ -17,9 +17,12 @@ class Config:
     webapp_url: str = ''
     webapp_port: int = 8080
 
+    rsvp_max_responses: int = 500
+    rsvp_rate_limit: int = 30
+
     @classmethod
-    def load(cls):
-        load_dotenv(ROOT / '.env')
+    def load(cls, env_file=None):
+        load_dotenv(env_file or ROOT / '.env')
         token = os.getenv('BOT_TOKEN','').strip()
         phone = re.sub(r'\D','',os.getenv('ADMIN_PHONE',''))
         if not token or not phone:
@@ -40,4 +43,7 @@ class Config:
         port = int(os.getenv('WEBAPP_PORT','8080'))
         if not 1 <= port <= 65535:
             raise ValueError('WEBAPP_PORT 1–65535 oralig‘ida bo‘lsin.')
-        return cls(token,phone,mode=='on',ttl,idle,str(path if path.is_absolute() else ROOT/path),webapp_url,port)
+        max_responses = int(os.getenv('RSVP_MAX_RESPONSES','500'))
+        rate_limit = int(os.getenv('RSVP_RATE_LIMIT_PER_MINUTE','30'))
+        if max_responses < 1 or rate_limit < 1: raise ValueError('RSVP limitlari musbat bo‘lishi kerak.')
+        return cls(token,phone,mode=='on',ttl,idle,str(path if path.is_absolute() else ROOT/path),webapp_url,port,max_responses,rate_limit)

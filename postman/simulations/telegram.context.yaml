@@ -2,6 +2,34 @@ purpose:
   stands_in_for: Telegram Bot API ning rasm, xabar, callback va polling metodlari
   unblocks: Haqiqiy token va foydalanuvchilarsiz Dispatcher, HTTP va SQLite oqimlarini tekshirish
 assumptions:
+  - id: m4-rsvp-notification-20261105
+    status: supported
+    claim: A ceremony RSVP remains stored when the Telegram sender notification fails, and a later retry sends the original receiver name and guest count without changing the response.
+    reason: The real authenticated local RSVP endpoint and SQLite were exercised against the repository-owned Telegram HTTP mock with an injected sendMessage 500 and a subsequent successful retry.
+    verification: Postman integration test verifies the pending record, retry, message contents and idempotent repeated RSVP. Real Telegram delivery remains unverified; ambiguous delivery timeouts can cause duplicate notifications.
+    source: tests/test_postman.py::test_ceremony_rsvp_with_postman_notification_retry; postman/mocks/telegram/default.js
+    updated_at: '2026-11-05'
+  - id: m3-creation-flow-20261105
+    status: supported
+    claim: Adding the invitation type choice preserves the existing fun bot flow against the repository-owned Telegram stand-in.
+    reason: The actual dispatcher and HTTP bot client were run against the local Postman mock after adding the type-selection callback.
+    verification: Five existing Postman integration cases passed. Ceremony creation and validation were exercised separately with the local Dispatcher HTTP fixture; real Telegram and devices remain unverified.
+    source: tests/test_postman.py; tests/test_ceremony.py; postman/mocks/telegram/default.js
+    updated_at: '2026-11-05'
+  - id: m1-staging-regression-20261105
+    status: supported
+    claim: The bot starts and completes the existing invitation flow against the repository-owned Telegram stand-in after the staging configuration and cache changes.
+    reason: Real local bot and HTTP application were exercised against the Postman Telegram mock, not live Telegram.
+    verification: Five Postman integration tests passed; simulation logged 156 requests, including startup and polling. Device behavior and real Telegram remain unverified.
+    source: tests/test_postman.py; postman/mocks/telegram/default.js
+    updated_at: '2026-11-05'
+  - id: m1-layout-selection-20261105
+    status: supported
+    claim: Sender can choose a text position before preview and publish, and acceptance still notifies the sender through the local Telegram stand-in.
+    reason: Dispatcher, SQLite and authenticated Mini App API were exercised against the repository-owned Telegram mock.
+    verification: Five Postman integration tests passed with default bottom selection, including startup, video invitation and notification failure cases. Live Telegram interaction remains unverified.
+    source: tests/test_postman.py; postman/mocks/telegram/default.js
+    updated_at: '2026-11-05'
   - id: registration-quota-suggestions-20261103
     status: supported
     claim: In local tests against the repository-owned Telegram stand-in, a verified user can request a link allowance and the admin can approve it; an approved text suggestion adds one credit only once.
@@ -71,6 +99,13 @@ assumptions:
     verification: 2026-11-02 18:32 dan keyin 2 user, 1 used link, 1 delivered photo, 1 open session va 2 yetkazilgan notice kuzatildi. Yangilangan bot ishlamoqda. Barcha 33 lokal test o'tdi; jonli ko'p hisobli sinovning qolgan qismi hali tasdiqlanmagan.
     source: TEST_REPORT.md; README.md
     updated_at: '2026-11-02'
+  - id: m4b-telegram-guest-list
+    status: supported
+    claim: Local Telegram mock records sender guest-list messages and RSVP notifications; the simulated 500 notification is retried.
+    reason: The real bot and SQLite run against the repository-owned Telegram HTTP stand-in, not live Telegram.
+    verification: Postman simulation request events showed sendMessage failure and retry; tests inspect notification and guest-list messages. Live delivery and mobile sharing remain unverified.
+    source: tests/test_postman.py::test_ceremony_rsvp_with_postman_notification_retry; postman/mocks/telegram/default.js
+    updated_at: '2026-11-05'
 fingerprints:
   - id: local-release-1
     date: '2026-11-02'

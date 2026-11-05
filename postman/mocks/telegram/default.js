@@ -26,6 +26,8 @@ const server = http.createServer(async (req, res) => {
     return reply(res, 200, {ok: true});
   }
   if (path === '/_test/calls') return reply(res, 200, calls);
+  if (path === '/_test/guest-messages') return reply(res, 200, calls.filter(call => call.method === 'sendMessage' && (call.body.text || '').includes('Kelaman:')));
+  if (path === '/_test/rsvp-notices') return reply(res, 200, calls.filter(call => call.method === 'sendMessage' && (call.body.text || '').includes('Taklifga javob')));
   if (path === '/_test/fail-next') {
     failNext = body;
     return reply(res, 200, {ok: true});
