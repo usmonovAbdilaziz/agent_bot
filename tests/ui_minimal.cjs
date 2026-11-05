@@ -28,8 +28,8 @@ const out=path.join(root,'output/minimal');
     }
     if(url.pathname.endsWith('/media') && kind==='video') return route.fulfill({contentType:videoType,body:videoBytes});
     if(url.pathname.endsWith('/media')) return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180"><rect width="180" height="180" fill="#dde8f0"/><text x="90" y="112" text-anchor="middle" font-family="sans-serif" font-size="64" fill="#38566e">M</text></svg>'});
-    if(url.pathname.startsWith('/api/')) return route.fulfill({contentType:'application/json',body:JSON.stringify({id:1,title:'Munis',description:'Siz bilan uchrashsam bo‘ladimi?\nBir piyola choy ustida suhbatlashamiz.',media_kind:kind,status:'ready',preview,design})});
-    const file=url.pathname==='/'?'index.html':path.basename(url.pathname);
+    if(url.pathname.startsWith('/api/') || url.pathname.startsWith('/bot/api/')) return route.fulfill({contentType:'application/json',body:JSON.stringify({id:1,title:'Munis',description:'Siz bilan uchrashsam bo‘ladimi?\nBir piyola choy ustida suhbatlashamiz.',media_kind:kind,status:'ready',preview,design})});
+    const file=url.pathname==='/' || url.pathname==='/bot/'?'index.html':path.basename(url.pathname);
     return route.fulfill({contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html',body:await fs.readFile(path.join(root,'web_minimal',file))});
    });
    await page.goto('http://qadam.test/?invite=1');
@@ -75,6 +75,8 @@ const out=path.join(root,'output/minimal');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     assert.equal(await page.locator('.yes').isDisabled(),true);
    }
+   await page.goto('http://qadam.test/bot/?invite=1');
+   await page.locator('.invitation.design-elegant').waitFor();
    // A browser-encoded video fixture exercises actual playback and sound controls.
    if(name==='mobile') {
     const encoded=await page.evaluate(async()=>{
