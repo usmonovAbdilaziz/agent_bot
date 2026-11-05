@@ -4,7 +4,7 @@ import secrets
 import time
 import re
 import html
-from datetime import datetime
+from datetime import datetime, timedelta, time as dt_time
 from zoneinfo import ZoneInfo
 from urllib.parse import urlsplit
 from db import DB
@@ -94,6 +94,16 @@ def valid_ceremony_details(value, *, complete=False, check_date=False):
     return True
 
 
+def ceremony_expiry(details, now=None):
+    now=time.time() if now is None else now
+    event=datetime.strptime(details['date'],'%d.%m.%Y').date()
+    try:
+        end=datetime.combine(event+timedelta(days=2),dt_time.min,tzinfo=ZoneInfo('Asia/Tashkent')).timestamp()
+    except (OverflowError, ValueError):
+        return now+400*86400
+    return min(end,now+400*86400)
+
+
 def ceremony_passed(details, now=None):
     try:
         event_date=datetime.strptime(details['date'],'%d.%m.%Y').date()
@@ -121,19 +131,14 @@ class InvitationDB(DB):
                 await c.execute("ALTER TABLE q_invites ADD COLUMN details TEXT NOT NULL DEFAULT '{}'")
             if 'share_mode' not in columns:
                 await c.execute("ALTER TABLE q_invites ADD COLUMN share_mode TEXT NOT NULL DEFAULT 'single' CHECK(share_mode IN ('single','open'))")
-            rsvp_columns = {r[1] for r in await (await c.execute('PRAGMA table_info(q_rsvps)')).fetchall()}
-            if 'telegram_user_id' not in rsvp_columns:
-                await c.execute('ALTER TABLE q_rsvps RENAME TO q_rsvps_old')
-                await c.execute("""CREATE TABLE q_rsvps (
-                    invite_id INTEGER NOT NULL REFERENCES q_invites(id), telegram_user_id INTEGER,
-                    attending INTEGER NOT NULL CHECK(attending IN (0,1)),
-                    guests INTEGER NOT NULL CHECK(guests BETWEEN 0 AND 10), responded_at REAL NOT NULL,
-                    receiver_name TEXT NOT NULL, notice_status TEXT NOT NULL DEFAULT 'pending',
-                    UNIQUE(invite_id,telegram_user_id))""")
-                await c.execute("""INSERT INTO q_rsvps SELECT r.invite_id,i.receiver,r.attending,r.guests,
-                    r.responded_at,r.receiver_name,r.notice_status FROM q_rsvps_old r
-                    LEFT JOIN q_invites i ON i.id=r.invite_id""")
-                await c.execute('DROP TABLE q_rsvps_old')
+            # executescript commits implicitly, so begin only after schema bootstrap.
+            await c.execute('BEGIN IMMEDIATE')
+            try:
+                await self._migrate_rsvps(c)
+                await c.commit()
+            except BaseException:
+                await c.rollback()
+                raise
             await c.execute('CREATE TABLE IF NOT EXISTS q_open_views(invite_id INTEGER NOT NULL, telegram_user_id INTEGER NOT NULL, PRIMARY KEY(invite_id,telegram_user_id))')
             await c.execute("UPDATE q_invites SET design='nafis' WHERE type='ceremony' AND design='ceremony_elegant'")
             request_columns = {r[1] for r in await (await c.execute('PRAGMA table_info(q_sender_requests)')).fetchall()}
@@ -148,6 +153,44 @@ class InvitationDB(DB):
                 await c.execute('DELETE FROM q_phone_grants WHERE phone_hash IN (SELECT phone_hash FROM q_profiles WHERE phone_hash IS NOT NULL)')
                 await c.execute("INSERT INTO settings VALUES('q_one_link_permissions','1')")
             await c.commit()
+
+    async def _migration_step(self, step):
+        """Test seam for interruption before transaction commit."""
+
+    async def _migrate_rsvps(self, c):
+        async def columns(table):
+            return {r[1] for r in await (await c.execute(f'PRAGMA table_info({table})')).fetchall()}
+        old_exists=bool(await (await c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='q_rsvps_old'")).fetchone())
+        current_columns=await columns('q_rsvps')
+        if not old_exists and 'telegram_user_id' in current_columns: return
+        if not old_exists:
+            await c.execute('ALTER TABLE q_rsvps RENAME TO q_rsvps_old')
+            await self._migration_step('rename')
+        elif 'telegram_user_id' not in current_columns:
+            # Bootstrap can recreate an empty legacy table after an interrupted rename.
+            if await (await c.execute('SELECT 1 FROM q_rsvps LIMIT 1')).fetchone():
+                raise RuntimeError('Both legacy RSVP tables contain data; manual recovery required')
+            await c.execute('DROP TABLE q_rsvps')
+        await c.execute("""CREATE TABLE IF NOT EXISTS q_rsvps (
+            invite_id INTEGER NOT NULL REFERENCES q_invites(id), telegram_user_id INTEGER,
+            attending INTEGER NOT NULL CHECK(attending IN (0,1)),
+            guests INTEGER NOT NULL CHECK(guests BETWEEN 0 AND 10), responded_at REAL NOT NULL,
+            receiver_name TEXT NOT NULL, notice_status TEXT NOT NULL DEFAULT 'pending',
+            UNIQUE(invite_id,telegram_user_id))""")
+        await self._migration_step('create')
+        rows=await (await c.execute("""SELECT r.invite_id,i.receiver AS telegram_user_id,r.attending,r.guests,
+            r.responded_at,r.receiver_name,r.notice_status FROM q_rsvps_old r
+            LEFT JOIN q_invites i ON i.id=r.invite_id""")).fetchall()
+        for row in rows:
+            existing=await (await c.execute('SELECT attending,guests,responded_at,receiver_name,notice_status FROM q_rsvps WHERE invite_id=? AND telegram_user_id IS ?', (row['invite_id'],row['telegram_user_id']))).fetchone()
+            values=tuple(row[k] for k in ('attending','guests','responded_at','receiver_name','notice_status'))
+            if existing and tuple(existing)!=values:
+                raise RuntimeError('Conflicting RSVP recovery rows; manual recovery required')
+            if not existing:
+                await c.execute('INSERT INTO q_rsvps VALUES(?,?,?,?,?,?,?)',(row['invite_id'],row['telegram_user_id'],*values))
+        await self._migration_step('insert')
+        await self._migration_step('before_drop')
+        await c.execute('DROP TABLE q_rsvps_old')
 
     async def sender_request(self, uid, quantity=1):
         async with self.connect(True) as c:
@@ -248,11 +291,13 @@ class InvitationDB(DB):
             row = await (await c.execute('SELECT * FROM q_invites WHERE id=? AND sender=?',(mid,uid))).fetchone()
             if not row or not row['title'].strip() or len(row['title'])>120 or not row['description'].strip() or not valid_design(row['design'], row['type']) or parse_details(row['details']) is None:
                 return None
+            if row['type']=='fun' and row['share_mode']!='single': return None
+            if row['share_mode'] not in ('single','open'): return None
             if row['type']=='ceremony' and (not valid_ceremony_details(parse_details(row['details']),complete=True,check_date=True) or row['description']!=parse_details(row['details'])['note']):
                 return None
             if row['status']=='draft':
                 if not await self._can_publish(c,uid): return None
-                await c.execute("UPDATE q_invites SET status='ready',token=?,expires_at=? WHERE id=?",(secrets.token_urlsafe(18),time.time()+ttl,mid))
+                await c.execute("UPDATE q_invites SET status='ready',token=?,expires_at=? WHERE id=?",(secrets.token_urlsafe(18),ceremony_expiry(parse_details(row['details'])) if row['type']=='ceremony' else time.time()+ttl,mid))
                 admin = await (await c.execute("SELECT value FROM settings WHERE key='admin'")).fetchone()
                 if not admin or admin[0]!=str(uid):
                     credit = await (await c.execute('SELECT remaining FROM q_sender_credits WHERE uid=?',(uid,))).fetchone()

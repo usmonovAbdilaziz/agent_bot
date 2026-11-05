@@ -136,6 +136,7 @@ main:has(.invitation) { max-width: none; padding: 0; }
 .ceremony-links button, .rsvp button { min-height: 48px; color: #14241e; background: #f4fff8; flex: 1 1 140px; }
 .rsvp { margin-top: 18px; padding-top: 18px; border-top: 1px solid #ffffff50; }
 .rsvp button[aria-pressed=true] { outline: 3px solid #a8e6c5; outline-offset: -3px; background: #d6f7e5; }
+.rsvp button[aria-pressed=true]:focus-visible { outline: 3px solid #1769c2; outline-offset: 4px; }
 .guest-stepper { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .guest-stepper div { display: flex; align-items: center; gap: 12px; }
 .guest-stepper button { min-width: 48px; padding: 8px; flex: none; }

@@ -10,6 +10,8 @@ import os
 import re
 import time
 from urllib.parse import urlencode
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
@@ -18,7 +20,7 @@ from aiogram.types import (BotCommand, CallbackQuery, InlineKeyboardButton, Inli
     KeyboardButton, Message, ReplyKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo, MenuButtonCommands)
 from designs import DESIGNS, valid_design
 from config import Config
-from invitation_store import InvitationDB, parse_details, valid_ceremony_details, EVENT_KINDS
+from invitation_store import InvitationDB, parse_details, valid_ceremony_details, EVENT_KINDS, ceremony_expiry
 
 MAX_MEDIA = 20 * 1024 * 1024
 CEREMONY_LABELS = {'wedding':'To‘y', 'nikah':'Nikoh', 'beshik':'Beshik to‘y', 'sunnat':'Sunnat to‘y', 'fotiha':'Fotiha', 'birthday':'Tug‘ilgan kun', 'other':'Boshqa'}
@@ -328,7 +330,8 @@ class App:
                   f'\nManzil: {esc(details.get("address","—"))}\nXarita: {esc(details.get("map_url") or "—")}'
                   f'\nDastur:\n{program}\nQo‘shimcha matn: {esc(details.get("note","—"))}'
                   f'\nMedia: {esc(kind)}\nMatn joyi: {esc(details.get("layout",{}).get("text_position","bottom"))}'
-                  f'\nDizayn: {esc(DESIGNS.get(item["design"],{}).get("label_uz","—"))}')
+                  f'\nDizayn: {esc(DESIGNS.get(item["design"],{}).get("label_uz","—"))}'
+                  f'\nHavola amal qilish muddati: {datetime.fromtimestamp(ceremony_expiry(details),ZoneInfo("Asia/Tashkent")).strftime("%d.%m.%Y %H:%M")} (Toshkent)')
             rows=[]
             if self.cfg.webapp_url: rows.append([self.web_button('Ko‘rinishini ochish',item['id'])])
             rows.append([InlineKeyboardButton(text='Tasdiqlash',callback_data=f'q:confirm:{item["id"]}')])

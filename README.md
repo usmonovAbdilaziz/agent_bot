@@ -87,15 +87,15 @@ Bot tokeni o‘zgarsa sender telefonini qayta tasdiqlash/tanlash kerak bo‘ladi
    sahifasining aynan o‘zini ko‘rsatadi. **Dizaynni tanlash** orqali Sodda, Romantik,
    Quvnoq, Nafis, Tug‘ilgan kun, Neon yoki Yangi yil ko‘rinishini tanlang va preview orqali tekshiring. **Tahrirlash**
    bosqichlarni qayta ochadi.
-5. **Tasdiqlash**: receiver uchun bitta bir martalik havola yaratadi. Adminning
+5. **Tasdiqlash**: fun receiver uchun bitta bir martalik havola yaratadi. Adminning
    ikkinchi tasdig‘i yo‘q. Takror bosish yangi havola yaratmaydi.
 
-Yangi qoralamada avval **Ko‘ngilochar** yoki **To‘y va marosimlar** tanlanadi.
+`ENABLE_CEREMONY=true` bo‘lsa yangi qoralamada **Ko‘ngilochar** yoki **To‘y va marosimlar** tanlanadi; standart o‘chiq holatda fun oqimi darhol boshlanadi.
 Marosim oqimida tur, sarlavha, sana, vaqt, manzil, ixtiyoriy xarita va dastur,
-qo‘shimcha matn, ixtiyoriy media, matn joyi va Nafis dizayn kiritiladi. Sana
+qo‘shimcha matn, ixtiyoriy media, matn joyi va Atlas, Nafis, Gold, Envelope yoki Ticket dizayni tanlanadi. Sana
 Toshkent sanasiga nisbatan o‘tgan bo‘lmasligi kerak. Mini Appda marosim ma’lumotlari,
 xarita va taqvim havolalari hamda bir martalik RSVP ko‘rinadi. Kelmaslik uchun
-mehmonlar soni 0 saqlanadi; kelishda 1–10 tanlanadi. Havola bitta oluvchiga bog‘lanadi.
+mehmonlar soni 0 saqlanadi; kelishda 1–10 tanlanadi. Shaxsiy havola bitta oluvchiga bog‘lanadi; ochiq havolani bir nechta mehmon ochishi mumkin.
 
 Qoralama va bosqich SQLite bazasida saqlanadi. Uzilishdan keyin `/start` bilan
 davom eting. `/cancel` tugallanmagan qoralamani bekor qiladi. Bu yordamchi buyruq
@@ -104,7 +104,7 @@ asosiy menyuga qo‘shilmagan.
 ## Receiver
 
 Havola `https://t.me/BOT?start=i_TOKEN` ko‘rinishida. Birinchi receiver `/start`
-bosganda havola unga birikadi. Bot faqat **Taklifni ochish** tugmasini yuboradi.
+bosganda fun yoki shaxsiy ceremony havolasi unga birikadi; ochiq ceremony havolasi ko‘p foydalanuvchiga ishlaydi. Bot faqat **Taklifni ochish** tugmasini yuboradi.
 Telegram `/start` javobidan Mini Appni avtomatik ochishga ruxsat bermaydi:
 foydalanuvchi bu tugmani bir marta bosadi.
 
@@ -130,7 +130,7 @@ oldin botni ishlatgan bo‘lsa ham. Oddiy `/start` ruxsatli senderning qoralamas
 davom ettiradi yoki sender bo‘lish taklifini ko‘rsatadi. Eski qabul qilingan
 havola qayta ishlamaydi. Oddiy receiver matnlariga javob berilmaydi.
 
-Havola odatda 48 soat amal qiladi. Egasi o‘z havolasini ishlatib yubormaydi.
+Fun havolasi odatda 48 soat amal qiladi; ceremony muddati quyida berilgan. Egasi o‘z havolasini ishlatib yubormaydi.
 Hali javob bermagan receiver eski taklif havolasini qayta ochsa, yangi HTTPS manzilli
 tugma oladi. Eski xabardagi tugma eski manzilga bog‘langan.
 
@@ -204,3 +204,5 @@ Ceremony dizaynlari: `atlas`, `nafis`, `gold`, `envelope`, `ticket`. Ilgari saql
 `ENABLE_CEREMONY=false` standart qiymat: yangi taklif fun oqimiga o‘tadi. `true` yangi ceremony yaratishni ko‘rsatadi; oldin yaratilgan ceremony havolalari va RSVP flagdan qat’i nazar ishlaydi. Lokal sozlama loyiha `.env` faylida; production deployer `/home/ubuntu/apps/agent_bot/.env` faylini Docker `--env-file` bilan o‘qiydi. Prod’da yoqish uchun operator shu faylda `ENABLE_CEREMONY=true` belgilaydi va keyingi Verified `main` deployida konteynerni yangidan yaratadi; `docker restart` env faylini qayta o‘qimaydi. Keyin health va test taklifni tekshiradi. Hech qachon tokenni hujjatga yozmang.
 
 Yangi dizayn: `react_src/designs.json`ga yagona ID, tur, nom va behavior yozing; `react_src/style.css`da kontrastli CSS qo‘shing; fun effekt kerak bo‘lsa `react_src/main.jsx`dagi lokal effektga ulang (ceremony hazil effektlarisiz); registry, Playwright, kontrast va reduced-motion testlarini yangilang, `npm run build` bilan `web_minimal`ni qayta yarating. Deploy va bazani qaytarish: [ROLLBACK.md](ROLLBACK.md).
+
+Ceremony havolasi Toshkent vaqti bilan marosim kuni tugaganidan keyin yana 24 soatgacha, nashrdan ko‘pi bilan 400 kungacha amal qiladi. Avvalgi havolalarning saqlangan muddati o‘zgarmaydi; avval javob bergan mehmon o‘z javobini keyin ham ko‘radi. Fun havolasining sozlangan TTL muddati o‘zgarmaydi. Media cache xotirada 16 MiB jami, 2 MiB har bir fayl va 15 daqiqa bilan cheklangan; katta videolar cache qilinmaydi. `MEDIA_DOWNLOAD_CONCURRENCY` (standart 4), `MEDIA_RATE_LIMIT_PER_MINUTE` (standart 120) sozlanadi; Range so‘rovi 206 qaytaradi.

@@ -26,7 +26,8 @@ async function api(path, { method = 'GET', json, blob = false } = {}) {
     });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
-      throw new Error(data.error || 'Taklif yuklanmadi. Qayta urinib ko‘ring.');
+      const error = new Error(data.error || 'Taklif yuklanmadi. Qayta urinib ko‘ring.');
+      error.code = data.code; throw error;
     }
     return blob ? response.blob() : response.json();
   } finally {
@@ -323,6 +324,7 @@ function CeremonyInvitation({ invite, onStatus }) {
     return () => clearTimeout(timer);
   }, [opening]);
   const position = ['top', 'center', 'bottom'].includes(details?.layout?.text_position) ? details.layout.text_position : 'bottom';
+  const [closed, setClosed] = useState(Boolean(invite.rsvp_closed));
   const [selection, setSelection] = useState(null);
   const [guests, setGuests] = useState(1);
   const [response, setResponse] = useState(invite.rsvp || null);
@@ -340,7 +342,12 @@ function CeremonyInvitation({ invite, onStatus }) {
     try {
       const result = await api(`/invites/${invite.id}/rsvp`, { method:'POST', json:{ attending:selection, guests:selection ? guests : 0 } });
       setResponse(result.rsvp); setSubmitted(true);
-    } catch (err) { setError(messageFor(err)); }
+    } catch (err) {
+      if (err.code === 'rsvp_closed') {
+        try { const latest = await api(`/invites/${invite.id}`); setResponse(latest.rsvp || null); setClosed(Boolean(latest.rsvp_closed)); }
+        catch (reloadError) { setError(messageFor(reloadError)); }
+      } else setError(messageFor(err));
+    }
     finally { setPending(false); }
   };
   return <section className={`invitation ceremony ceremony-${design} position-${position}`}>
@@ -365,7 +372,7 @@ function CeremonyInvitation({ invite, onStatus }) {
           <h2 id="rsvp-title">{submitted ? 'Javobingiz uchun rahmat!' : 'Siz javob bergansiz'}</h2>
           <p>{response.attending ? `Kelaman · ${response.guests} mehmon` : 'Kela olmayman'}</p>
           <button type="button" onClick={()=>tg?.close()}>Telegramga qaytish</button>
-        </> : invite.rsvp_closed ? <h2 id="rsvp-title">Marosim o‘tib ketgan</h2> : <>
+        </> : closed ? <h2 id="rsvp-title">Marosim o‘tib ketgan</h2> : <>
           <h2 id="rsvp-title">Tashrifingizni tasdiqlang</h2>
           {invite.preview && <p>Bu ko‘rib chiqish. Javobni oluvchi yuboradi.</p>}
           <div className="rsvp-options">

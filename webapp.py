@@ -4,7 +4,7 @@ import time
 import asyncio
 from collections import OrderedDict
 from aiohttp import web
-from designs import valid_design
+from designs import DESIGNS, valid_design
 from invitation_store import parse_details, valid_ceremony_details, ceremony_passed
 from web_common import BOT_APP, STATIC, ApiProblem, protect, page, healthz
 
@@ -15,6 +15,9 @@ PHOTO_CACHE_ENTRIES=64
 PHOTO_CACHE_TTL=15*60
 PHOTO_CACHE=web.AppKey('photo_cache', object)
 PHOTO_LOCK=web.AppKey('photo_lock', object)
+MEDIA_SEMAPHORE=web.AppKey('media_semaphore', object)
+MEDIA_FLIGHTS=web.AppKey('media_flights', object)
+MEDIA_RATES=web.AppKey('media_rates', object)
 
 class PhotoCache:
     def __init__(self):
@@ -68,6 +71,7 @@ async def detail(request):
     if details is None or (item['type']=='ceremony' and not valid_ceremony_details(details,complete=True)):
         raise ApiProblem('Taklif ma’lumotlari noto‘g‘ri.',409)
     details['layout'] = {**details.get('layout', {}), 'text_position': details.get('layout', {}).get('text_position', 'bottom')}
+    if item['design'] in DESIGNS and not valid_design(item['design'],item['type']): raise ApiProblem('Taklif dizayni turiga mos emas.',409)
     design = item['design'] if valid_design(item['design'], item['type']) else ('nafis' if item['type']=='ceremony' else 'classic')
     response = await request.app[BOT_APP].db.one('SELECT attending,guests,responded_at FROM q_rsvps WHERE invite_id=? AND telegram_user_id=?',(item['id'],request['uid'])) if item['type']=='ceremony' else None
     return web.json_response({k:item[k] for k in ('id','title','description','media_kind','status')} | {
@@ -86,16 +90,47 @@ async def media(request):
     app=request.app[BOT_APP]
     item=await invite_for(request)
     if item['media_kind']=='none': raise ApiProblem('Media yo‘q.',404)
-    if item['media_kind']=='photo':
-        async with request.app[PHOTO_LOCK]:
-            item=await invite_for(request)
-            data=request.app[PHOTO_CACHE].get(item['file_id'])
-            if data is None:
-                data=await download_media(app,item['file_id'])
-                request.app[PHOTO_CACHE].put(item['file_id'],data)
-        return web.Response(body=data,content_type='image/jpeg')
-    data=await download_media(app,item['file_id'])
-    return web.Response(body=data,content_type='video/mp4')
+    now=time.monotonic(); rates=request.app[MEDIA_RATES]
+    for uid in list(rates):
+        if rates[uid][-1]<=now-60: del rates[uid]
+    times=rates.setdefault(request['uid'],[])
+    times[:]=[t for t in times if t>now-60]
+    if len(times)>=getattr(app.cfg,'media_rate_limit',120): raise ApiProblem('Media so‘rovlari juda ko‘p. Bir daqiqadan so‘ng qayta urinib ko‘ring.',429)
+    times.append(now)
+    cache=request.app[PHOTO_CACHE]; flights=request.app[MEDIA_FLIGHTS]; key=item['file_id']
+    async with request.app[PHOTO_LOCK]:
+        data=cache.get(key)
+        if data is None:
+            task=flights.get(key)
+            if task is None:
+                async def fetch():
+                    async with request.app[MEDIA_SEMAPHORE]:
+                        result=await download_media(app,key)
+                    async with request.app[PHOTO_LOCK]: cache.put(key,result)
+                    return result
+                task=asyncio.create_task(fetch()); flights[key]=task
+                def finish(done):
+                    if flights.get(key) is done: flights.pop(key,None)
+                    if not done.cancelled(): done.exception()
+                task.add_done_callback(finish)
+    if data is None: data=await asyncio.shield(task)
+    content_type='image/jpeg' if item['media_kind']=='photo' else 'video/mp4'
+    headers={'Accept-Ranges':'bytes'}
+    range_header=request.headers.get('Range')
+    if range_header:
+        import re
+        match=re.fullmatch(r'bytes=(\d*)-(\d*)',range_header.strip())
+        if not match or (not match[1] and not match[2]):
+            return web.Response(status=416,headers={'Content-Range':f'bytes */{len(data)}','Accept-Ranges':'bytes'})
+        if match[1]:
+            start=int(match[1]); end=min(int(match[2]) if match[2] else len(data)-1,len(data)-1)
+        else:
+            suffix=int(match[2]); start=max(0,len(data)-suffix); end=len(data)-1
+        if start>=len(data) or start>end:
+            return web.Response(status=416,headers={'Content-Range':f'bytes */{len(data)}','Accept-Ranges':'bytes'})
+        headers['Content-Range']=f'bytes {start}-{end}/{len(data)}'
+        return web.Response(status=206,body=memoryview(data)[start:end+1],content_type=content_type,headers=headers)
+    return web.Response(body=data,content_type=content_type,headers=headers)
 
 async def download_media(app,file_id):
     file=await app.bot.get_file(file_id)
@@ -147,7 +182,7 @@ async def rsvp(request):
         if item['type']!='ceremony': raise ApiProblem('Bu taklifda RSVP mavjud emas.',409)
         async with request.app[PHOTO_LOCK]:
             response=await app.db.rsvp(item['id'],request['uid'],attending,guests if attending else 0,name,app.cfg.rsvp_max_responses)
-            if response=='passed': raise ApiProblem('Marosim o‘tib ketgan.',409)
+            if response=='passed': raise ApiProblem('Marosim o‘tib ketgan.',409,'rsvp_closed')
             if response=='limit': raise ApiProblem('Bu taklif uchun javoblar soni chegaraga yetdi.',409)
             if response is None: raise ApiProblem('Javobni saqlab bo‘lmadi.',409)
             if item['media_kind']=='photo': request.app[PHOTO_CACHE].remove(item['file_id'])
@@ -167,8 +202,13 @@ def create_web_app(app):
     server[BOT_APP]=app
     server[PHOTO_CACHE]=PhotoCache()
     server[PHOTO_LOCK]=app.photo_lock
+    server[MEDIA_SEMAPHORE]=asyncio.Semaphore(getattr(app.cfg,'media_concurrency',4))
+    server[MEDIA_FLIGHTS]={}
+    server[MEDIA_RATES]={}
     app.photo_cache=server[PHOTO_CACHE]
     async def clear_cache(application):
+        for task in list(application[MEDIA_FLIGHTS].values()): task.cancel()
+        if application[MEDIA_FLIGHTS]: await asyncio.gather(*list(application[MEDIA_FLIGHTS].values()),return_exceptions=True)
         application[PHOTO_CACHE].clear()
     server.on_cleanup.append(clear_cache)
     server.router.add_get('/',page)
