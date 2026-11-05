@@ -262,3 +262,34 @@ async def test_minimal_video_invitation_through_postman(tmp_path,notice_error):
                 assert any(c['method']=='sendMessage' and str(c['body'].get('chat_id'))=='1' and 'Yangi g‘oya' in c['body'].get('text','') for c in flow_calls)
     finally:
         await runner.cleanup()
+
+async def test_ceremony_rsvp_with_postman_notification_retry(tmp_path):
+    from invitation_store import InvitationDB
+    from main import App as MinimalApp
+    from webapp import create_web_app
+    from aiohttp import web
+    from test_webapp import signed
+    token='123456:TEST_ONLY_NOT_A_REAL_TOKEN'
+    bot=Bot(token,session=AiohttpSession(api=TelegramAPIServer.from_base(URL)),default=DefaultBotProperties(parse_mode='HTML'))
+    db=InvitationDB(tmp_path/'rsvp.sqlite3'); await db.init()
+    details={'event_kind':'nikah','date':'01.01.2099','time':'10:00','address':'Toshkent','map_url':'','program':[],'note':'Xush kelibsiz','layout':{'text_position':'bottom'}}
+    await db.run("INSERT INTO q_invites(id,sender,receiver,title,description,created_at,expires_at,status,type,design,details) VALUES(1,1,2,'Bayram','Xush kelibsiz',?,?, 'ready','ceremony','ceremony_elegant',?)",(time.time(),time.time()+3600,json.dumps(details)))
+    cfg=Config(token,'998900000000',webapp_url='https://mini.example.test')
+    app=MinimalApp(bot,db,cfg,'test_agent_bot'); runner=web.AppRunner(create_web_app(app)); await runner.setup()
+    site=web.TCPSite(runner,'127.0.0.1',0); await site.start(); port=site._server.sockets[0].getsockname()[1]
+    try:
+        async with bot, aiohttp.ClientSession() as client:
+            async with client.post(URL+'/_test/reset',json={}) as response: assert response.status==200
+            async with client.post(URL+'/_test/fail-next',json={'method':'sendMessage','chat_id':1,'code':500}) as response: assert response.status==200
+            address=f'http://127.0.0.1:{port}/api/invites/1/rsvp'; headers={'X-Telegram-Init-Data':signed(token,2)}
+            async with client.post(address,headers=headers,json={'attending':1,'guests':3}) as response:
+                assert response.status==200 and (await response.json())['rsvp']['guests']==3
+            assert (await db.one('SELECT * FROM q_rsvps WHERE invite_id=1'))['notice_status']=='pending'
+            await app.notify_rsvp(1)
+            assert (await db.one('SELECT * FROM q_rsvps WHERE invite_id=1'))['notice_status']=='sent'
+            async with client.get(URL+'/_test/rsvp-notices') as response: notices=await response.json()
+            assert len(notices)==2 and all('Ism2' in x['body']['text'] and 'Mehmonlar soni: 3' in x['body']['text'] for x in notices)
+            async with client.post(address,headers=headers,json={'attending':0,'guests':0}) as response:
+                assert response.status==200 and (await response.json())['rsvp']['guests']==3
+    finally:
+        await runner.cleanup()

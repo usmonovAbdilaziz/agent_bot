@@ -55,7 +55,8 @@ async def invite_for(request):
     item=await app.db.invite(mid)
     if not item or request['uid'] not in (item['sender'],item['receiver']):
         raise ApiProblem('Taklif topilmadi.',404)
-    if request['uid']!=item['sender'] and item['status']!='accepted' and (
+    answered = item['type']=='ceremony' and request['uid']==item['receiver'] and await app.db.one('SELECT 1 FROM q_rsvps WHERE invite_id=?',(item['id'],))
+    if request['uid']!=item['sender'] and not answered and item['status']!='accepted' and (
             item['status']!='ready' or item['expires_at']<=time.time()):
         raise ApiProblem('Taklif muddati tugagan.',409)
     return item
@@ -67,10 +68,11 @@ async def detail(request):
         raise ApiProblem('Taklif ma’lumotlari noto‘g‘ri.',409)
     details['layout'] = {**details.get('layout', {}), 'text_position': details.get('layout', {}).get('text_position', 'bottom')}
     design = item['design'] if valid_design(item['design'], item['type']) else ('ceremony_elegant' if item['type']=='ceremony' else 'classic')
+    response = await request.app[BOT_APP].db.one('SELECT attending,guests,responded_at FROM q_rsvps WHERE invite_id=?',(item['id'],)) if item['type']=='ceremony' else None
     return web.json_response({k:item[k] for k in ('id','title','description','media_kind','status')} | {
         'design':design,
         'type':item['type'], 'details':details,
-        'preview':request['uid']==item['sender']})
+        'preview':request['uid']==item['sender'], 'rsvp':dict(response) if response else None})
 
 class BoundedBuffer(io.BytesIO):
     def write(self, data):
@@ -121,6 +123,27 @@ async def accept(request):
     await app.notify_acceptance(item['id'])
     return web.json_response({'accepted':True})
 
+async def rsvp(request):
+    app=request.app[BOT_APP]
+    try: payload=await request.json()
+    except (ValueError,TypeError): raise ApiProblem('Javob formati noto‘g‘ri.',400)
+    if not isinstance(payload,dict): raise ApiProblem('Javob formati noto‘g‘ri.',400)
+    attending=payload.get('attending'); guests=payload.get('guests')
+    if type(attending) is not int or attending not in (0,1) or type(guests) is not int or (attending==1 and not 1<=guests<=10) or (attending==0 and guests not in (0,1)):
+        raise ApiProblem('Javob yoki mehmonlar soni noto‘g‘ri.',400)
+    person=request['telegram_user']
+    name=' '.join(filter(None,[person.first_name,person.last_name])) or 'Oluvchi'
+    async with app.lock:
+        item=await invite_for(request)
+        if item['receiver']!=request['uid']: raise ApiProblem('Faqat oluvchi javob beradi.',403)
+        if item['type']!='ceremony': raise ApiProblem('Bu taklifda RSVP mavjud emas.',409)
+        async with request.app[PHOTO_LOCK]:
+            response=await app.db.rsvp(item['id'],request['uid'],attending,guests if attending else 0,name)
+            if response is None: raise ApiProblem('Javobni saqlab bo‘lmadi.',409)
+            if item['media_kind']=='photo': request.app[PHOTO_CACHE].remove(item['file_id'])
+    await app.notify_rsvp(item['id'])
+    return web.json_response({'rsvp':response})
+
 @web.middleware
 async def media_policy(request, handler):
     response=await handler(request)
@@ -143,6 +166,7 @@ def create_web_app(app):
     server.router.add_get('/api/invites/{mid}',detail)
     server.router.add_get('/api/invites/{mid}/media',media)
     server.router.add_post('/api/invites/{mid}/accept',accept)
+    server.router.add_post('/api/invites/{mid}/rsvp',rsvp)
     server.router.add_static('/assets',STATIC,show_index=False)
     return server
 

@@ -92,12 +92,29 @@ class App:
             await self.db.run('UPDATE q_accept_notices SET status=? WHERE invite_id=?',
                               ('sent' if sent else 'failed', mid))
 
+    async def notify_rsvp(self, mid):
+        async with self.notice_lock:
+            response=await self.db.one("SELECT * FROM q_rsvps WHERE invite_id=? AND notice_status='pending'",(mid,))
+            if not response: return
+            item=await self.db.invite(mid)
+            decision='Kelaman' if response['attending'] else 'Kela olmayman'
+            text=(f'💌 <b>Taklifga javob</b>\nTaklif: {esc(item["title"])}\n'
+                  f'Oluvchi: {esc(response["receiver_name"])}\nJavob: {decision}\nMehmonlar soni: {response["guests"]}')
+            try: sent=await asyncio.wait_for(self.send(item['sender'],text),timeout=10)
+            except (TelegramAPIError,OSError,TimeoutError) as exc:
+                logging.warning('RSVP xabari keyinroq yuboriladi: %s',type(exc).__name__)
+                return
+            await self.db.run('UPDATE q_rsvps SET notice_status=? WHERE invite_id=?',('sent' if sent else 'failed',mid))
+
     async def acceptance_notifications(self):
         while True:
             try:
                 notices = await self.db.all("SELECT invite_id FROM q_accept_notices WHERE status='pending' ORDER BY invite_id LIMIT 20")
                 for notice in notices:
                     await self.notify_acceptance(notice['invite_id'])
+                rsvps=await self.db.all("SELECT invite_id FROM q_rsvps WHERE notice_status='pending' ORDER BY invite_id LIMIT 20")
+                for response in rsvps:
+                    await self.notify_rsvp(response['invite_id'])
                 requests = await self.db.all("SELECT id FROM q_sender_requests WHERE (status='pending' AND admin_notified=0) OR (status!='pending' AND decision_notified=0) ORDER BY id LIMIT 20")
                 for request in requests:
                     await self.notify_sender_request(request['id'])

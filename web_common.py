@@ -37,6 +37,7 @@ async def protect(request, handler):
                 raise ApiProblem('Botda xabar olish o‘chirilgan yoki foydalanish cheklangan. /start ni tekshiring.', 403)
             request['uid'] = signed.user.id
             request['user'] = user
+            request['telegram_user'] = signed.user
         response = await handler(request)
     except ApiProblem as exc:
         response = web.json_response({'error': exc.message}, status=exc.status)

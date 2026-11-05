@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS q_done(uid INTEGER PRIMARY KEY, completed_at REAL NOT
 CREATE TABLE IF NOT EXISTS q_seen(uid INTEGER NOT NULL, message_id INTEGER NOT NULL, PRIMARY KEY(uid,message_id));
 CREATE TABLE IF NOT EXISTS q_accept_notices(
  invite_id INTEGER PRIMARY KEY, status TEXT NOT NULL DEFAULT 'pending');
+CREATE TABLE IF NOT EXISTS q_rsvps(
+ invite_id INTEGER PRIMARY KEY REFERENCES q_invites(id), attending INTEGER NOT NULL CHECK(attending IN (0,1)),
+ guests INTEGER NOT NULL CHECK(guests BETWEEN 0 AND 10), responded_at REAL NOT NULL,
+ receiver_name TEXT NOT NULL, notice_status TEXT NOT NULL DEFAULT 'pending');
 CREATE TABLE IF NOT EXISTS q_sender_requests(
  id INTEGER PRIMARY KEY AUTOINCREMENT, uid INTEGER NOT NULL,
  status TEXT NOT NULL DEFAULT 'pending', created_at REAL NOT NULL,
@@ -266,3 +270,16 @@ class InvitationDB(DB):
             await c.execute('INSERT OR IGNORE INTO q_done VALUES(?,?)',(uid,time.time()))
             await c.execute('INSERT OR IGNORE INTO q_accept_notices(invite_id) VALUES(?)',(mid,))
             return True
+
+    async def rsvp(self, mid, uid, attending, guests, receiver_name):
+        if type(attending) is not int or attending not in (0,1) or type(guests) is not int or (attending and not 1<=guests<=10) or (not attending and guests!=0): return None
+        async with self.connect(True) as c:
+            invite=await (await c.execute('SELECT * FROM q_invites WHERE id=? AND receiver=?',(mid,uid))).fetchone()
+            if not invite or invite['type']!='ceremony' or invite['status']!='ready': return None
+            previous=await (await c.execute('SELECT attending,guests,responded_at FROM q_rsvps WHERE invite_id=?',(mid,))).fetchone()
+            if previous: return dict(previous)
+            if invite['expires_at']<=time.time(): return None
+            await c.execute('INSERT INTO q_rsvps(invite_id,attending,guests,responded_at,receiver_name) VALUES(?,?,?,?,?)',
+                            (mid,attending,guests,time.time(),receiver_name[:200]))
+            row=await (await c.execute('SELECT attending,guests,responded_at FROM q_rsvps WHERE invite_id=?',(mid,))).fetchone()
+            return dict(row)

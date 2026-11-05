@@ -283,14 +283,96 @@ function FunInvitation({ invite, onStatus, accepted }) {
   );
 }
 
-// Temporary read-only ceremony view; RSVP is introduced in M4.
+const CEREMONY_NAMES = { wedding: 'To‘y', nikah: 'Nikoh', beshik: 'Beshik to‘y', sunnat: 'Sunnat to‘y', fotiha: 'Fotiha', birthday: 'Tug‘ilgan kun', other: 'Boshqa' };
+const MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentabr','oktabr','noyabr','dekabr'];
+const DAYS = ['yakshanba','dushanba','seshanba','chorshanba','payshanba','juma','shanba'];
+const MAP_HOSTS = new Set(['maps.google.com','maps.google.co.uz','maps.app.goo.gl','goo.gl','yandex.uz','yandex.ru','yandex.com','maps.yandex.ru','maps.yandex.com','2gis.uz','2gis.ru','2gis.com','go.2gis.com']);
+function safeMapURL(value) {
+  if (typeof value !== 'string' || !value || value.length > 500 || /[\s\x00-\x1f]/.test(value)) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || !MAP_HOSTS.has(url.hostname) || url.username || url.password || (url.port && url.port !== '443')) return null;
+    if (['yandex.uz','yandex.ru','yandex.com'].includes(url.hostname) && !url.pathname.startsWith('/maps')) return null;
+    if (url.hostname === 'goo.gl' && !url.pathname.startsWith('/maps/')) return null;
+    return url.href;
+  } catch { return null; }
+}
+function ceremonyDate(date) {
+  const [day, month, year] = date.split('.').map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return `${DAYS[weekday]}, ${day}-${MONTHS[month - 1]} ${year}`;
+}
+function calendarURL(invite) {
+  const d = invite.details;
+  const [day, month, year] = d.date.split('.').map(Number);
+  const [hour, minute] = d.time.split(':').map(Number);
+  const start = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
+  const local = value => value.toISOString().replace(/[-:]/g,'').replace('.000Z','');
+  const params = new URLSearchParams({ action:'TEMPLATE', text:invite.title, dates:`${local(start)}/${local(end)}`,
+    ctz:'Asia/Tashkent', location:d.address, details:d.note || '' });
+  return `https://calendar.google.com/calendar/render?${params}`;
+}
 function CeremonyInvitation({ invite, onStatus }) {
-  const position = ['top', 'center', 'bottom'].includes(invite.details?.layout?.text_position) ? invite.details.layout.text_position : 'bottom';
-  return <section className={`invitation design-elegant position-${position}`}>
+  const details = invite.details;
+  const position = ['top', 'center', 'bottom'].includes(details?.layout?.text_position) ? details.layout.text_position : 'bottom';
+  const [selection, setSelection] = useState(null);
+  const [guests, setGuests] = useState(1);
+  const [response, setResponse] = useState(invite.rsvp || null);
+  const [submitted, setSubmitted] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  const map = safeMapURL(details.map_url);
+  const openLink = url => {
+    if (tg?.openLink) tg.openLink(url);
+    else setError('Havolani ochib bo‘lmadi. Telegram orqali qayta oching.');
+  };
+  const submit = async () => {
+    if (pending || selection === null || invite.preview) return;
+    setPending(true); setError('');
+    try {
+      const result = await api(`/invites/${invite.id}/rsvp`, { method:'POST', json:{ attending:selection, guests:selection ? guests : 0 } });
+      setResponse(result.rsvp); setSubmitted(true);
+    } catch (err) { setError(messageFor(err)); }
+    finally { setPending(false); }
+  };
+  return <section className={`invitation ceremony design-elegant position-${position}`}>
     <BackgroundMedia invite={invite} onError={message => onStatus(message, true)} />
     <div className="scrim" aria-hidden="true" />
-    <div className="invitation-content"><div className="text-panel" tabIndex="0">
-      <h1>{invite.title}</h1><p className="description">{invite.description}</p>
+    <div className="invitation-content"><div className="text-panel ceremony-panel" tabIndex="0">
+      <h1>{invite.title}</h1>
+      <div className="ceremony-cards">
+        <section className="ceremony-card"><h2>Marosim</h2><p>{CEREMONY_NAMES[details.event_kind] || details.event_kind}</p></section>
+        <section className="ceremony-card"><h2>Sana va vaqt</h2><p>{ceremonyDate(details.date)} · {details.time}</p></section>
+        <section className="ceremony-card"><h2>Manzil</h2><p>{details.address}</p></section>
+        {details.program?.length > 0 && <section className="ceremony-card"><h2>Dastur</h2><ul>{details.program.map((line,index)=><li key={index}>{line}</li>)}</ul></section>}
+        {details.note && <section className="ceremony-card"><h2>Qo‘shimcha ma’lumot</h2><p className="description">{details.note}</p></section>}
+      </div>
+      <div className="ceremony-links">
+        {map && <button type="button" onClick={()=>openLink(map)}>Xaritada ochish</button>}
+        <button type="button" onClick={()=>openLink(calendarURL(invite))}>Taqvimga qo‘shish</button>
+      </div>
+      <section className="rsvp" aria-labelledby="rsvp-title">
+        {response ? <>
+          <h2 id="rsvp-title">{submitted ? 'Javobingiz uchun rahmat!' : 'Siz javob bergansiz'}</h2>
+          <p>{response.attending ? `Kelaman · ${response.guests} mehmon` : 'Kela olmayman'}</p>
+          <button type="button" onClick={()=>tg?.close()}>Telegramga qaytish</button>
+        </> : <>
+          <h2 id="rsvp-title">Tashrifingizni tasdiqlang</h2>
+          {invite.preview && <p>Bu ko‘rib chiqish. Javobni oluvchi yuboradi.</p>}
+          <div className="rsvp-options">
+            <button type="button" aria-pressed={selection===1} disabled={pending || invite.preview} onClick={()=>setSelection(1)}>Kelaman</button>
+            <button type="button" aria-pressed={selection===0} disabled={pending || invite.preview} onClick={()=>setSelection(0)}>Kela olmayman</button>
+          </div>
+          {selection===1 && <div className="guest-stepper"><span>Mehmonlar soni</span><div>
+            <button type="button" aria-label="Mehmonni kamaytirish" disabled={guests<=1 || pending} onClick={()=>setGuests(n=>n-1)}>−</button>
+            <output aria-live="polite">{guests}</output>
+            <button type="button" aria-label="Mehmonni qo‘shish" disabled={guests>=10 || pending} onClick={()=>setGuests(n=>n+1)}>+</button>
+          </div></div>}
+          <button className="rsvp-submit" type="button" disabled={selection===null || pending || invite.preview} onClick={submit}>{pending?'Yuborilmoqda…':'Javobni yuborish'}</button>
+        </>}
+        {error && <p role="alert" className="rsvp-error">{error}</p>}
+      </section>
     </div></div>
   </section>;
 }

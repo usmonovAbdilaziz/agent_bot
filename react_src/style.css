@@ -122,3 +122,24 @@ main:has(.invitation) { max-width: none; padding: 0; }
 @keyframes neon-even { 50% { text-shadow: 3px 0 #e000a6, -3px 0 #007b86; } }
 @keyframes neon-odd { 50% { text-shadow: -3px 0 #e000a6, 3px 0 #007b86; } }
 @media (prefers-reduced-motion: reduce) { .invitation .invitation-content.reaction-even, .invitation .invitation-content.reaction-odd, .design-neon .no.glitch { animation: none; } .invitation .arena .yes:not(:disabled):active { transform: translateX(-50%); } }
+
+/* Ceremony content retains the M1 media, scrim and panel, with scrollable cards. */
+.ceremony .invitation-content { padding-bottom: max(32px, env(safe-area-inset-bottom)); }
+.ceremony .ceremony-panel { max-height: none; overflow: visible; text-align: left; }
+.ceremony-panel h1 { text-align: center; }
+.ceremony-card { padding: 14px; border: 1px solid #ffffff42; border-radius: 14px; background: #ffffff0d; overflow-wrap: anywhere; }
+.ceremony-cards { display: grid; gap: 10px; }
+.ceremony-card h2, .rsvp h2 { margin: 0 0 6px; font-size: 16px; color: #fff; }
+.ceremony-card p, .ceremony-card ul { margin: 0; color: #fff; }
+.ceremony-card ul { padding-left: 22px; }
+.ceremony-links, .rsvp-options { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.ceremony-links button, .rsvp button { min-height: 48px; color: #14241e; background: #f4fff8; flex: 1 1 140px; }
+.rsvp { margin-top: 18px; padding-top: 18px; border-top: 1px solid #ffffff50; }
+.rsvp button[aria-pressed=true] { outline: 3px solid #a8e6c5; outline-offset: -3px; background: #d6f7e5; }
+.guest-stepper { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.guest-stepper div { display: flex; align-items: center; gap: 12px; }
+.guest-stepper button { min-width: 48px; padding: 8px; flex: none; }
+.guest-stepper output { min-width: 20px; text-align: center; }
+.rsvp .rsvp-submit { width: 100%; margin-top: 14px; }
+.rsvp-error { margin-top: 12px; color: #fff; font-weight: 600; }
+.rsvp > button:not(.rsvp-submit) { margin-top: 14px; }

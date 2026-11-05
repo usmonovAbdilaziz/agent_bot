@@ -2,6 +2,13 @@ purpose:
   stands_in_for: Telegram Bot API ning rasm, xabar, callback va polling metodlari
   unblocks: Haqiqiy token va foydalanuvchilarsiz Dispatcher, HTTP va SQLite oqimlarini tekshirish
 assumptions:
+  - id: m4-rsvp-notification-20261105
+    status: supported
+    claim: A ceremony RSVP remains stored when the Telegram sender notification fails, and a later retry sends the original receiver name and guest count without changing the response.
+    reason: The real authenticated local RSVP endpoint and SQLite were exercised against the repository-owned Telegram HTTP mock with an injected sendMessage 500 and a subsequent successful retry.
+    verification: Postman integration test verifies the pending record, retry, message contents and idempotent repeated RSVP. Real Telegram delivery remains unverified; ambiguous delivery timeouts can cause duplicate notifications.
+    source: tests/test_postman.py::test_ceremony_rsvp_with_postman_notification_retry; postman/mocks/telegram/default.js
+    updated_at: '2026-11-05'
   - id: m3-creation-flow-20261105
     status: supported
     claim: Adding the invitation type choice preserves the existing fun bot flow against the repository-owned Telegram stand-in.

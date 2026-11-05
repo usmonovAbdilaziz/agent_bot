@@ -93,8 +93,9 @@ Bot tokeni o‘zgarsa sender telefonini qayta tasdiqlash/tanlash kerak bo‘ladi
 Yangi qoralamada avval **Ko‘ngilochar** yoki **To‘y va marosimlar** tanlanadi.
 Marosim oqimida tur, sarlavha, sana, vaqt, manzil, ixtiyoriy xarita va dastur,
 qo‘shimcha matn, ixtiyoriy media, matn joyi va Nafis dizayn kiritiladi. Sana
-Toshkent sanasiga nisbatan o‘tgan bo‘lmasligi kerak. Mini Appda M4 gacha faqat
-fon va matn ko‘rinadi; RSVP mavjud emas. Havola hozircha bitta oluvchiga bog‘lanadi.
+Toshkent sanasiga nisbatan o‘tgan bo‘lmasligi kerak. Mini Appda marosim ma’lumotlari,
+xarita va taqvim havolalari hamda bir martalik RSVP ko‘rinadi. Kelmaslik uchun
+mehmonlar soni 0 saqlanadi; kelishda 1–10 tanlanadi. Havola bitta oluvchiga bog‘lanadi.
 
 Qoralama va bosqich SQLite bazasida saqlanadi. Uzilishdan keyin `/start` bilan
 davom eting. `/cancel` tugallanmagan qoralamani bekor qiladi. Bu yordamchi buyruq
