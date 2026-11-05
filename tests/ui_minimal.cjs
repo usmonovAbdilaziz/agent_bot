@@ -31,7 +31,10 @@ const out=path.join(root,'output/minimal');
     if(url.pathname.endsWith('/media')) return route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180"><rect width="180" height="180" fill="${mediaColor}"/></svg>`});
     if(url.pathname.startsWith('/api/') || url.pathname.startsWith('/bot/api/')) return route.fulfill({contentType:'application/json',body:JSON.stringify({id:1,title:'Munis',description:longText?'Juda uzun matn. '.repeat(120):'Siz bilan uchrashsam bo‘ladimi?\nBir piyola choy ustida suhbatlashamiz.',media_kind:kind,status:'ready',preview,design,details:{layout:{text_position:position}}})});
     const file=url.pathname==='/' || url.pathname==='/bot/'?'index.html':path.basename(url.pathname);
-    return route.fulfill({contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html',body:await fs.readFile(path.join(root,'web_minimal',file))});
+    let body=await fs.readFile(path.join(root,'web_minimal',file));
+    // Emulate a WebView that discards unsupported dvh declarations.
+    if(file.endsWith('.css') && process.env.TEST_LEGACY_VIEWPORT==='1') body=body.toString().replace(/(?:min-height|height):100dvh;?/g,'').replace(/max-height:min\(45dvh,430px\);?/g,'');
+    return route.fulfill({contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html',body});
    });
    await page.goto('http://qadam.test/?invite=1');
    await page.getByRole('button',{name:'Ha',exact:true}).waitFor();
