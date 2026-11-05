@@ -61,3 +61,15 @@ async def test_historical_schema_upgrade_and_old_invite_open(n,api,tmp_path,snap
     assert await database.claim('old-token',2)==1
     status,data=await api('GET','/api/invites/1',uid=2)
     assert status==200 and data['title']=='Old' and data['type']=='fun' and data['share_mode']=='single'
+
+async def test_bot_preview_escapes_html_and_ampersand(n):
+    from test_ceremony import start, FUTURE
+    mid=await start(n)
+    await n.msg(1,'<script>x</script> <b>name</b> &')
+    await n.msg(1,FUTURE); await n.msg(1,'18:30'); await n.msg(1,'<b>address</b> &')
+    await n.cb(1,f'q:cskip:{mid}'); await n.cb(1,f'q:cskip:{mid}')
+    await n.msg(1,'<script>note</script> &'); await n.cb(1,f'q:cskip:{mid}')
+    await n.cb(1,f'q:clayout:{mid}:bottom'); await n.cb(1,f'q:cdesign:{mid}:nafis'); await n.cb(1,f'q:cshare:{mid}:open')
+    text=n.sent(1)[-1]['text']
+    assert '&lt;script&gt;x&lt;/script&gt;' in text and '&lt;b&gt;name&lt;/b&gt;' in text and '&amp;' in text
+    assert '<script>' not in text and '<b>name</b>' not in text
