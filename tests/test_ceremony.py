@@ -35,7 +35,7 @@ async def finish(n,mid,skip=True,mode="single"):
     await n.cb(1,f'q:cskip:{mid}')
     assert any(button['text']=='O‘tkazib yuborish' for row in json.loads(n.sent(1)[-1]['reply_markup'])['inline_keyboard'] for button in row)
     await n.cb(1,f'q:clayout:{mid}:top')
-    await n.cb(1,f'q:cdesign:{mid}:ceremony_elegant')
+    await n.cb(1,f'q:cdesign:{mid}:nafis')
     assert (await n.db.flow(1))['stage']=='c_share'
     assert 'manzil va vaqtni' in n.sent(1)[-1]['text']
     await n.cb(1,f'q:cshare:{mid}:{mode}')

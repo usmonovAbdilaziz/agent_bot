@@ -68,7 +68,7 @@ async def detail(request):
     if details is None or (item['type']=='ceremony' and not valid_ceremony_details(details,complete=True)):
         raise ApiProblem('Taklif ma’lumotlari noto‘g‘ri.',409)
     details['layout'] = {**details.get('layout', {}), 'text_position': details.get('layout', {}).get('text_position', 'bottom')}
-    design = item['design'] if valid_design(item['design'], item['type']) else ('ceremony_elegant' if item['type']=='ceremony' else 'classic')
+    design = item['design'] if valid_design(item['design'], item['type']) else ('nafis' if item['type']=='ceremony' else 'classic')
     response = await request.app[BOT_APP].db.one('SELECT attending,guests,responded_at FROM q_rsvps WHERE invite_id=? AND telegram_user_id=?',(item['id'],request['uid'])) if item['type']=='ceremony' else None
     return web.json_response({k:item[k] for k in ('id','title','description','media_kind','status')} | {
         'design':design,

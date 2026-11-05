@@ -315,6 +315,13 @@ function calendarURL(invite) {
 }
 function CeremonyInvitation({ invite, onStatus }) {
   const details = invite.details;
+  const design = DESIGNS[invite.design]?.type === 'ceremony' ? invite.design : 'nafis';
+  const [opening, setOpening] = useState(() => design === 'envelope' && !matchMedia('(prefers-reduced-motion: reduce)').matches);
+  useEffect(() => {
+    if (!opening) return undefined;
+    const timer = setTimeout(() => setOpening(false), 1350);
+    return () => clearTimeout(timer);
+  }, [opening]);
   const position = ['top', 'center', 'bottom'].includes(details?.layout?.text_position) ? details.layout.text_position : 'bottom';
   const [selection, setSelection] = useState(null);
   const [guests, setGuests] = useState(1);
@@ -336,14 +343,15 @@ function CeremonyInvitation({ invite, onStatus }) {
     } catch (err) { setError(messageFor(err)); }
     finally { setPending(false); }
   };
-  return <section className={`invitation ceremony design-elegant position-${position}`}>
+  return <section className={`invitation ceremony ceremony-${design} position-${position}`}>
+    {opening && <button className="envelope-intro" type="button" autoFocus onClick={() => setOpening(false)} aria-label="Konvertni ochish, animatsiyani o‘tkazib yuborish"><span className="envelope-shape" aria-hidden="true"><span className="envelope-flap" /><span className="envelope-seal">✦</span></span><span>Taklifni ochish</span></button>}
     <BackgroundMedia invite={invite} onError={message => onStatus(message, true)} />
     <div className="scrim" aria-hidden="true" />
-    <div className="invitation-content"><div className="text-panel ceremony-panel" tabIndex="0">
+    {!opening && <div className="invitation-content"><div className="text-panel ceremony-panel" tabIndex="0">
       <h1>{invite.title}</h1>
       <div className="ceremony-cards">
         <section className="ceremony-card"><h2>Marosim</h2><p>{CEREMONY_NAMES[details.event_kind] || details.event_kind}</p></section>
-        <section className="ceremony-card"><h2>Sana va vaqt</h2><p>{ceremonyDate(details.date)} · {details.time}</p></section>
+        <section className="ceremony-card ceremony-date"><h2>Sana va vaqt</h2><p>{design === 'ticket' ? <><span>{ceremonyDate(details.date)}</span><span>{details.time}</span></> : <>{ceremonyDate(details.date)} · {details.time}</>}</p></section>
         <section className="ceremony-card"><h2>Manzil</h2><p>{details.address}</p></section>
         {details.program?.length > 0 && <section className="ceremony-card"><h2>Dastur</h2><ul>{details.program.map((line,index)=><li key={index}>{line}</li>)}</ul></section>}
         {details.note && <section className="ceremony-card"><h2>Qo‘shimcha ma’lumot</h2><p className="description">{details.note}</p></section>}
@@ -373,7 +381,7 @@ function CeremonyInvitation({ invite, onStatus }) {
         </>}
         {error && <p role="alert" className="rsvp-error">{error}</p>}
       </section>
-    </div></div>
+    </div></div>}
   </section>;
 }
 

@@ -36,3 +36,5 @@ fixture sinovlari. Jonli Telegramdagi yakuniy tekshiruv lokal testlardan alohida
 ## Ochiq ceremony havolasi
 
 Ceremony yaratishda ochiq (standart) yoki shaxsiy havola tanlanadi. Ochiq havolani olgan har kim marosim vaqti va manzilini ko‘rishi mumkin; har bir Telegram foydalanuvchisining birinchi RSVP javobi alohida saqlanadi. Sender `/guests` orqali faqat o‘z takliflarini tanlab, javoblar va mehmonlar sonini sahifalab ko‘radi. Dastlabki 50 javobga alohida xabar yuboriladi, keyingi javoblar ro‘yxatda ko‘rinadi. Fun havolasi shaxsiy va bir martalik bo‘lib qoladi.
+
+Marosim taklifida Atlas, Nafis, Oltin, Konvert va Bilet dizaynlari mavjud. Konvertni bosish yoki klaviaturada ochish mumkin; harakat kamaytirilgan bo‘lsa, karta darhol chiqadi. Barcha dizaynlarda RSVP va havola rejimi bir xil ishlaydi.

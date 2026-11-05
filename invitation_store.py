@@ -126,6 +126,7 @@ class InvitationDB(DB):
                     LEFT JOIN q_invites i ON i.id=r.invite_id""")
                 await c.execute('DROP TABLE q_rsvps_old')
             await c.execute('CREATE TABLE IF NOT EXISTS q_open_views(invite_id INTEGER NOT NULL, telegram_user_id INTEGER NOT NULL, PRIMARY KEY(invite_id,telegram_user_id))')
+            await c.execute("UPDATE q_invites SET design='nafis' WHERE type='ceremony' AND design='ceremony_elegant'")
             request_columns = {r[1] for r in await (await c.execute('PRAGMA table_info(q_sender_requests)')).fetchall()}
             if 'quantity' not in request_columns:
                 await c.execute('ALTER TABLE q_sender_requests ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1')

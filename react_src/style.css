@@ -143,3 +143,30 @@ main:has(.invitation) { max-width: none; padding: 0; }
 .rsvp .rsvp-submit { width: 100%; margin-top: 14px; }
 .rsvp-error { margin-top: 12px; color: #fff; font-weight: 600; }
 .rsvp > button:not(.rsvp-submit) { margin-top: 14px; }
+
+/* Ceremony designs use the shared opaque M1 text panel over any image. */
+.ceremony { --fallback: linear-gradient(145deg,#355a4e,#14251e); --scrim: linear-gradient(#10281cc7,#06150ce0); }
+.ceremony .invitation-content { z-index: 2; }
+.ceremony .ceremony-panel { background: rgba(0,0,0,.94); color: #fff; }
+.ceremony::before { content:""; position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.6; }
+.ceremony-atlas { --fallback: linear-gradient(145deg,#0c5770,#062847); }
+.ceremony-atlas::before { background: repeating-linear-gradient(45deg,transparent 0 24px,#d8b45a66 25px 27px,transparent 28px 52px), repeating-linear-gradient(-45deg,transparent 0 24px,#37c4c566 25px 28px,transparent 29px 52px); }
+.ceremony-nafis { --fallback: linear-gradient(145deg,#a7bd9c,#476753); }
+.ceremony-nafis .ceremony-panel { border: 1px solid #c5aa68; }
+.ceremony-nafis h1,.ceremony-gold h1,.ceremony-envelope h1 { font-family: Georgia, 'Times New Roman', serif; }
+.ceremony-gold { --fallback: linear-gradient(145deg,#24201a,#080808); }
+.ceremony-gold .ceremony-panel { border: 1px solid #c5a457; box-shadow: inset 0 0 0 5px #17150c; }
+.ceremony-gold .ceremony-card { border-color: #c5a45799; }
+.ceremony-envelope { --fallback: linear-gradient(145deg,#9a7561,#3d302e); }
+.ceremony-ticket { --fallback: linear-gradient(145deg,#4c4e66,#1a1a2e); }
+.ceremony-ticket .ceremony-panel { border: 2px solid #e8dcb2; border-radius: 22px; }
+.ceremony-ticket .ceremony-date { border: 0; border-top: 1px solid #f0e0a8; border-radius: 0; padding-bottom: 19px; background-image: radial-gradient(circle, #f0e0a8 2px, transparent 2.5px); background-size: 12px 6px; background-repeat: repeat-x; background-position: bottom; }
+.ceremony-ticket .ceremony-date p { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+.envelope-intro { position:fixed; inset:0; z-index:10; width:100%; height:100%; border-radius:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; color:#fff; background:#392a27; }
+.envelope-shape { width:min(72vw,300px); aspect-ratio:1.5; background:#f2e0c6; border:3px solid #b69a75; border-radius:8px; display:grid; place-items:center; position:relative; overflow:hidden; animation:envelope-open 1.35s ease both; }
+.envelope-shape::before { content:""; position:absolute; inset:0; background:linear-gradient(145deg,transparent 49%,#ccb294 50%,transparent 51%),linear-gradient(-145deg,transparent 49%,#ccb294 50%,transparent 51%); }
+.envelope-flap { position:absolute; top:0; left:0; width:100%; height:55%; background:#e4caa8; clip-path:polygon(0 0,100% 0,50% 100%); transform-origin:top; animation:flap-open 1.35s ease both; }
+@keyframes flap-open { 0%,40% { transform:rotateX(0); } 90%,100% { transform:rotateX(155deg); } }
+.envelope-seal { z-index:1; display:grid; place-items:center; width:50px; height:50px; border-radius:50%; color:#fff; background:#8c3434; font-size:26px; }
+@keyframes envelope-open { 0%,35% { transform:scale(.88); opacity:0; } 55% { opacity:1; transform:scale(1); } 100% { opacity:1; transform:scale(1.05); } }
+@media (prefers-reduced-motion:reduce) { .envelope-shape, .envelope-flap { animation:none; } }

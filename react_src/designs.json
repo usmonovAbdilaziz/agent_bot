@@ -140,10 +140,58 @@
     }
   },
   {
-    "id": "ceremony_elegant",
+    "id": "atlas",
+    "type": "ceremony",
+    "label_uz": "Atlas",
+    "emoji": "🔷",
+    "effect": "none",
+    "behavior": {
+      "evasive_no": false,
+      "show_sticker": false,
+      "rsvp": false
+    }
+  },
+  {
+    "id": "nafis",
     "type": "ceremony",
     "label_uz": "Nafis",
-    "emoji": "💍",
+    "emoji": "🌿",
+    "effect": "none",
+    "behavior": {
+      "evasive_no": false,
+      "show_sticker": false,
+      "rsvp": false
+    }
+  },
+  {
+    "id": "gold",
+    "type": "ceremony",
+    "label_uz": "Oltin",
+    "emoji": "✨",
+    "effect": "none",
+    "behavior": {
+      "evasive_no": false,
+      "show_sticker": false,
+      "rsvp": false
+    }
+  },
+  {
+    "id": "envelope",
+    "type": "ceremony",
+    "label_uz": "Konvert",
+    "emoji": "💌",
+    "effect": "none",
+    "behavior": {
+      "evasive_no": false,
+      "show_sticker": false,
+      "rsvp": false
+    }
+  },
+  {
+    "id": "ticket",
+    "type": "ceremony",
+    "label_uz": "Bilet",
+    "emoji": "🎟",
     "effect": "none",
     "behavior": {
       "evasive_no": false,

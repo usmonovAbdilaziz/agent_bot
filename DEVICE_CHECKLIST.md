@@ -24,3 +24,10 @@ Har bir sinov uchun qurilma modeli, OS va Telegram versiyasi, sana, natija va ke
 - [ ] Ceremony rejim tanlashdagi maxfiylik ogohlantirishi, shaxsiy rejim va Telegram share tugmasini qurilmada tekshiring.
 - [ ] Sender `/guests` orqali bir nechta taklifdan tanlasin, uzun ro‘yxatning oldingi/keyingi sahifalarini ko‘rsin; boshqa hisob kira olmasin.
 - [ ] Sender dastlabki 50 ta javobga alohida xabar olishini, 51-javob ro‘yxatda chiqib, alohida xabar yuborilmasligini tekshiring.
+
+## M5 — marosim dizaynlari
+
+- [ ] Konvert animatsiyasi haqiqiy qurilmada silliq ochilishini, bosib darhol o‘tkazishni va reduced motion holatini tekshiring.
+- [ ] Atlas naqshi, nafis va oltin bezaklar haqiqiy ekranda ko‘rinishini tekshiring.
+- [ ] Bilet perforatsiyasi hamda sana/vaqt qismlari turli ekranlarda to‘g‘ri ko‘rinishini tekshiring.
+- [ ] Har besh dizaynda yorqin va murakkab rasm ustida sarlavha, manzil, dastur va RSVP matni o‘qilishini tekshiring.

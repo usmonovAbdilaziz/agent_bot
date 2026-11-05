@@ -349,7 +349,9 @@ class App:
             choices=[(label,f'q:cevent:{mid}:{key}') for key,label in CEREMONY_LABELS.items()]
             rows.extend(choices[i:i+2] for i in range(0,len(choices),2))
         elif stage=='c_layout': rows.extend([[('Yuqorida',f'q:clayout:{mid}:top'),('O‘rtada',f'q:clayout:{mid}:center')],[('Pastda',f'q:clayout:{mid}:bottom'),('O‘tkazib yuborish',f'q:clayout:{mid}:bottom')]])
-        elif stage=='c_design': rows.append([('💍 Nafis',f'q:cdesign:{mid}:ceremony_elegant')])
+        elif stage=='c_design':
+            choices=[(f"{d['emoji']} {d['label_uz']}",f"q:cdesign:{mid}:{d['id']}") for d in DESIGNS.values() if d['type']=='ceremony']
+            rows.extend(choices[i:i+2] for i in range(0,len(choices),2))
         elif stage=='c_share': rows.extend([[('🌐 Ochiq havola (standart)',f'q:cshare:{mid}:open')],[('🔒 Shaxsiy havola',f'q:cshare:{mid}:single')]])
         elif stage=='c_preview': return await self.preview(uid,item)
         if stage in ('c_map','c_program','c_media'): rows.append([('O‘tkazib yuborish',f'q:cskip:{mid}')])
@@ -589,9 +591,9 @@ class App:
             if action=='ctype' and flow['stage']=='type' and choice in ('fun','ceremony'):
                 if item['type']!=choice:
                     await self.db.run('UPDATE q_invites SET type=?,design=?,details=?,description=?,share_mode=? WHERE id=?',
-                        (choice,'ceremony_elegant' if choice=='ceremony' else 'classic','{}','', 'open' if choice=='ceremony' else 'single',mid))
+                        (choice,'nafis' if choice=='ceremony' else 'classic','{}','', 'open' if choice=='ceremony' else 'single',mid))
                 elif choice=='ceremony' and not valid_design(item['design'],'ceremony'):
-                    await self.db.run("UPDATE q_invites SET design='ceremony_elegant' WHERE id=?",(mid,))
+                    await self.db.run("UPDATE q_invites SET design='nafis' WHERE id=?",(mid,))
                 await self.db.stage(uid,'c_kind' if choice=='ceremony' else 'media',mid)
             elif item['type']=='ceremony' and action=='cevent' and flow['stage']=='c_kind' and choice in EVENT_KINDS:
                 if not await self.db.update_ceremony_details(mid,uid,{'event_kind':choice}): return
