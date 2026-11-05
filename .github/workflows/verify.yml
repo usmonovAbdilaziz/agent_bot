@@ -29,6 +29,8 @@ jobs:
       - run: npm run test:ui
       - run: git diff --exit-code -- web_minimal
       - run: node tests/ui_m6_contrast.cjs
+      - run: node tests/ui_m6_a11y.cjs
+      - run: node tests/ui_m6_motion.cjs
   quality-slow:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
