@@ -78,7 +78,7 @@ Bot tokeni o‘zgarsa sender telefonini qayta tasdiqlash/tanlash kerak bo‘ladi
 
 ## Sender
 
-1. **Rasm / video**: rasm, MP4 video yoki dumaloq video xabar yuboring. Video
+1. **Rasm / video**: rasm, MP4 video yoki Telegram video xabar yuboring (Mini App’da fon to‘liq ekranda, aylana emas). Video
    60 soniyagacha, fayl 20 MiB gacha. Media kerak bo‘lmasa **Rasm/videosiz davom etish**.
 2. **Ism**: Telegram full name avtomatik chiqadi. **Shu ismni qoldirish** yoki
    o‘zingiz yangi ism/matn yozing (1–120 belgi).
@@ -198,3 +198,9 @@ Yangi ceremony uchun standart ochiq havola: bot rejim tanlashda havola egalariga
 `RSVP_MAX_RESPONSES` (standart `500`) va `RSVP_RATE_LIMIT_PER_MINUTE` (standart `30`) sozlanadi. Tezlik chegarasi jarayon xotirasida saqlanadi. Mavjud takliflar migratsiyada shaxsiy qoladi va avvalgi RSVP oluvchiga bog‘lanadi.
 
 Ceremony dizaynlari: `atlas`, `nafis`, `gold`, `envelope`, `ticket`. Ilgari saqlangan `ceremony_elegant` qiymati `nafis`ga migratsiya qilinadi. Aktivlar lokal CSS, tizim serif shriftlari va mavjud rasm/video fonidan iborat; tashqi shrift yoki CDN ishlatilmaydi.
+
+### Release flag va dizayn qo‘shish
+
+`ENABLE_CEREMONY=false` standart qiymat: yangi taklif fun oqimiga o‘tadi. `true` yangi ceremony yaratishni ko‘rsatadi; oldin yaratilgan ceremony havolalari va RSVP flagdan qat’i nazar ishlaydi. Lokal sozlama loyiha `.env` faylida; production deployer `/home/ubuntu/apps/agent_bot/.env` faylini Docker `--env-file` bilan o‘qiydi. Prod’da yoqish uchun operator shu faylda `ENABLE_CEREMONY=true` belgilaydi va keyingi Verified `main` deployida konteynerni yangidan yaratadi; `docker restart` env faylini qayta o‘qimaydi. Keyin health va test taklifni tekshiradi. Hech qachon tokenni hujjatga yozmang.
+
+Yangi dizayn: `react_src/designs.json`ga yagona ID, tur, nom va behavior yozing; `react_src/style.css`da kontrastli CSS qo‘shing; fun effekt kerak bo‘lsa `react_src/main.jsx`dagi lokal effektga ulang (ceremony hazil effektlarisiz); registry, Playwright, kontrast va reduced-motion testlarini yangilang, `npm run build` bilan `web_minimal`ni qayta yarating. Deploy va bazani qaytarish: [ROLLBACK.md](ROLLBACK.md).

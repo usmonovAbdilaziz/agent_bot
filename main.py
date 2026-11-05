@@ -289,6 +289,11 @@ class App:
         if flow['stage']=='phone':
             return await self.send(uid,'Senderning telefon raqamini kiriting:\nMasalan: +998901234567',reply_markup=kb([('Orqaga','q:home')]))
         item = await self.db.invite(mid)
+        if not getattr(self.cfg,'enable_ceremony',False) and item['type']=='ceremony' and item['status']=='draft':
+            return await self.send(uid,'Marosim yaratish vaqtincha o‘chirilgan. Qoralama saqlandi; bekor qilish: /cancel.')
+        if flow['stage']=='type' and not getattr(self.cfg,'enable_ceremony',False):
+            await self.db.stage(uid,'media',mid)
+            return await self.prompt(uid)
         if flow['stage']=='type':
             return await self.send(uid,'<b>Taklif turini tanlang:</b>',reply_markup=kb(
                 [('🎈 Ko‘ngilochar',f'q:ctype:{mid}:fun'),('💍 To‘y va marosimlar',f'q:ctype:{mid}:ceremony')],
@@ -476,6 +481,7 @@ class App:
         item = await self.db.invite(flow['invite_id'])
         if not item or item['status']!='draft': return await self.home(uid)
         stage=flow['stage']
+        if item['type']=='ceremony' and not getattr(self.cfg,'enable_ceremony',False): return await self.prompt(uid)
         if item['type']=='ceremony' and stage in ('c_title','c_date','c_time','c_address','c_map','c_program','c_note'):
             if not text or cmd.startswith('/'):
                 return await self.send(uid,'Ma’lumotni matn ko‘rinishida yuboring.')
@@ -525,6 +531,13 @@ class App:
         parts=(q.data or '').split(':')
         if len(parts)<2 or parts[0]!='q': return  # Old menus have no active handlers.
         action=parts[1]
+        if not getattr(self.cfg,'enable_ceremony',False):
+            if (action=='ctype' and len(parts)==4 and parts[3]=='ceremony') or action in ('cevent','clayout','cdesign','cshare','cback','cskip'):
+                return await self.send(uid,'Marosim yaratish vaqtincha o‘chirilgan.')
+            if action=='confirm' and len(parts)==3 and parts[2].isdigit():
+                draft=await self.db.invite(int(parts[2]))
+                if draft and draft['sender']==uid and draft['type']=='ceremony' and draft['status']=='draft':
+                    return await self.send(uid,'Marosim yaratish vaqtincha o‘chirilgan.')
         if action=='guests' and len(parts)==4 and parts[2].isdigit() and parts[3].isdigit(): return await self.guests(uid,int(parts[2]),int(parts[3]))
         if action=='glist' and len(parts)==3 and parts[2].isdigit(): return await self.guests(uid,page=int(parts[2]))
         if action=='request': return await self.request_sender(uid)
