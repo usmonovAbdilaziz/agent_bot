@@ -100,3 +100,25 @@ main:has(.invitation) { max-width: none; padding: 0; }
 .sound { min-height: 48px; margin: 0; }
 .media-note { color: #fff; margin: 0; }
 @media (max-width: 360px) { .invitation-content { padding-left: 16px; padding-right: 16px; } }
+
+/* M2: all geometry stays inside the existing invitation content area. */
+.invitation .arena { height: 214px; }
+.invitation .arena .yes { left: 50%; transform: translateX(-50%); max-width: 100%; padding: 0 12px; }
+.invitation .arena .yes:not(:disabled):active { transform: translateX(-50%) scale(.97); }
+.invitation .arena .no { width: 132px; max-width: 45%; min-height: 48px; padding: 8px; line-height: 1.15; }
+.invitation .invitation-content.reaction-even { animation: strong-shake-even 250ms ease-in-out; }
+.invitation .invitation-content.reaction-odd { animation: strong-shake-odd 250ms ease-in-out; }
+.design-birthday { --fallback: linear-gradient(145deg, #6d3470, #301c49); --scrim: linear-gradient(#32152dcc, #1a1026dc); }
+.design-neon { --fallback: linear-gradient(145deg, #10131d, #03040a); --scrim: linear-gradient(#020712c9, #03040ae6); }
+.design-newyear { --fallback: radial-gradient(circle at 22% 20%, #426b90, transparent 24%), radial-gradient(circle at 80% 30%, #385575, transparent 18%), linear-gradient(145deg, #132d50, #071525); --scrim: linear-gradient(#0c1e36bd, #05101ee8); }
+.design-neon .text-panel { box-shadow: 0 0 0 2px #4ef7ff, 0 0 18px #4ef7ff88; }
+.design-neon .no.glitch { text-shadow: 1px 0 #e000a6, -1px 0 #007b86; }
+.design-neon .no.glitch-even { animation: neon-even 260ms steps(2, end); }
+.design-neon .no.glitch-odd { animation: neon-odd 260ms steps(2, end); }
+#fireworks { z-index: 10; }
+.sticker { z-index: 9; }
+@keyframes strong-shake-even { 25% { translate: -3px 0; } 75% { translate: 3px 0; } }
+@keyframes strong-shake-odd { 25% { translate: 3px 0; } 75% { translate: -3px 0; } }
+@keyframes neon-even { 50% { text-shadow: 3px 0 #e000a6, -3px 0 #007b86; } }
+@keyframes neon-odd { 50% { text-shadow: -3px 0 #e000a6, 3px 0 #007b86; } }
+@media (prefers-reduced-motion: reduce) { .invitation .invitation-content.reaction-even, .invitation .invitation-content.reaction-odd, .design-neon .no.glitch { animation: none; } .invitation .arena .yes:not(:disabled):active { transform: translateX(-50%); } }

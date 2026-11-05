@@ -85,7 +85,7 @@ Bot tokeni o‘zgarsa sender telefonini qayta tasdiqlash/tanlash kerak bo‘ladi
 3. **Tavsif**: taklif matnini yuboring (1–2000 belgi); keyin matnni yuqori, o‘rta yoki pastga joylashtiring yoki standart pastki joyni tanlang.
 4. **Ko‘rib chiqish**: media va matn chatda chiqadi. **Ko‘rinishini ochish** receiver
    sahifasining aynan o‘zini ko‘rsatadi. **Dizaynni tanlash** orqali Sodda, Romantik,
-   Quvnoq yoki Nafis ko‘rinishni tanlang va preview orqali tekshiring. **Tahrirlash**
+   Quvnoq, Nafis, Tug‘ilgan kun, Neon yoki Yangi yil ko‘rinishini tanlang va preview orqali tekshiring. **Tahrirlash**
    bosqichlarni qayta ochadi.
 5. **Tasdiqlash**: receiver uchun bitta bir martalik havola yaratadi. Adminning
    ikkinchi tasdig‘i yo‘q. Takror bosish yangi havola yaratmaydi.
@@ -103,8 +103,9 @@ foydalanuvchi bu tugmani bir marta bosadi.
 
 Sahifada rasm/video butun ekran foni bo‘ladi; media bo‘lmasa dizayn gradienti ko‘rinadi. Uning ustida ism, tavsif va **Ha / Yo‘q** turadi.
 Video ovozsiz o‘ynaydi; **Ovozni yoqish** bilan ovoz yoqiladi. Yo‘q tugmasi
-sichqoncha/teginish/klaviaturadan qochadi. Har 10 urinishda 😡 stiker ko‘rinishidagi
-reaksiya vaqtincha chiqadi va urinishlar davom etadi. Telegramning yopish tugmasi
+sichqoncha/teginish/klaviaturadan qochadi, Ha esa kattalashadi. Beshinchi urinishdan
+iboralar, har o‘ninchi urinishda vaqtinchalik 😡 va yigirmanchi urinishdan kuchliroq
+reaksiya ko‘rinadi. Reduced motion sozlamasida titrash o‘chiriladi. Telegramning yopish tugmasi
 mavjud; rad etishga majburlovchi server amali yo‘q.
 
 **Ha** faqat server javobni saqlagach bayram animatsiyasini chiqaradi va 2.8 soniyadan

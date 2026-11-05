@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "test:ui": "node tests/ui_minimal.cjs"
+    "test:ui": "node tests/ui_minimal.cjs",
+    "test:ui:m2": "node tests/ui_m2.cjs"
   },
   "dependencies": {
     "react": "^19.2.0",

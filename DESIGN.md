@@ -10,7 +10,9 @@ button. Preview shares the exact rendering, disables acceptance and explains ret
 to the bot. Yo‘q remains in its arena and cannot overlap Ha. Every ten attempts shows
 a temporary 😡 without a modal or extra dismiss step. Pointer and keyboard supported.
 
-Server-confirmed Ha shows short fireworks and thanks, then closes the Mini App.
-Reduced motion skips fireworks and position transitions. Error states allow retry.
+Each no attempt enlarges Ha within its arena. Design registry thresholds control
+phrases, the temporary sticker and a stronger reaction. Server-confirmed Ha shows
+the chosen design's local celebration and thanks, then closes the Mini App.
+Reduced motion skips celebration and shaking. Error states allow retry.
 Telegram's native close always remains available. Long text wraps, focus is visible,
 controls have minimum 48px hit targets. Success is never shown on a failed request.

@@ -65,6 +65,17 @@ async def test_design_selection_persists_and_is_returned_to_receiver(n,api):
     await n.cb(1,f'q:style:{mid}:elegant')
     assert (await n.db.invite(mid))['design']=='romantic'
 
+async def test_fun_registry_options_are_available_in_two_column_rows(n):
+    from designs import DESIGNS
+    mid=await draft(n)
+    await n.cb(1,f'q:design:{mid}')
+    rows=json.loads(n.sent(1)[-1]['reply_markup'])['inline_keyboard']
+    assert [len(row) for row in rows]==[2,2,2,1]
+    assert {button['callback_data'].split(':')[-1] for row in rows for button in row}==set(DESIGNS)
+    for design in ('birthday','neon','newyear'):
+        await n.cb(1,f'q:style:{mid}:{design}')
+        assert (await n.db.invite(mid))['design']==design
+
 async def video(n,duration=60,size=1024,note=False):
     n.update_id+=1
     v={'file_id':'video_id','file_unique_id':'video_unique','duration':duration,'file_size':size}
