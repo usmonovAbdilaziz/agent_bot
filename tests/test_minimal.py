@@ -365,3 +365,15 @@ async def test_invalid_design_and_type_are_rejected(n):
     assert await n.db.publish(mid, 1, n.cfg.ttl) is None
     await n.db.run("UPDATE q_invites SET type='fun', design='unknown' WHERE id=?", (mid,))
     assert await n.db.publish(mid, 1, n.cfg.ttl) is None
+
+
+@pytest.mark.parametrize('legacy_design', ['', 'old-design'])
+async def test_unknown_legacy_design_opens_as_classic_and_can_be_accepted(n, api, legacy_design):
+    item = await ready(n)
+    await n.db.run('UPDATE q_invites SET design=? WHERE id=?', (legacy_design, item['id']))
+    await n.msg(2, f'/start i_{item["token"]}')
+    status, data = await api('GET', f'/api/invites/{item["id"]}', 2)
+    assert status == 200 and data['design'] == 'classic'
+    status, data = await api('POST', f'/api/invites/{item["id"]}/accept', 2, json={})
+    assert status == 200 and data['accepted']
+    assert (await n.db.invite(item['id']))['design'] == legacy_design
