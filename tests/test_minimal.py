@@ -213,7 +213,7 @@ async def test_photo_uses_smaller_variant_and_cache_still_enforces_permissions(n
     mid=(await n.db.flow(1))['invite_id']
     n.update_id+=1
     photos=[{'file_id':name,'file_unique_id':name,'width':size,'height':size,'file_size':100}
-            for name,size in [('small',90),('medium',480),('large',1280)]]
+            for name,size in [('small',320),('medium',800),('large',1280)]]
     payload={'message_id':n.update_id,'date':int(time.time()),'chat':{'id':1,'type':'private'},
              'from':n.user(1),'photo':photos}
     await n.dp.feed_update(n.bot,Update.model_validate({'update_id':n.update_id,'message':payload}))
@@ -231,6 +231,31 @@ async def test_photo_uses_smaller_variant_and_cache_still_enforces_permissions(n
     assert (await api('GET',f'/api/invites/{mid}/media',3))[0]==404
     await n.db.run('UPDATE q_invites SET expires_at=0 WHERE id=?',(mid,))
     assert (await api('GET',f'/api/invites/{mid}/media',2))[0]==409
+
+@pytest.mark.parametrize('sizes,expected', [([320,800,1280],800), ([320],320), ([1280],1280), ([320,600],600)])
+def test_photo_width_selection(sizes, expected, caplog):
+    from types import SimpleNamespace
+    from main import select_photo
+    photos=[SimpleNamespace(width=size,height=100,file_id='private') for size in sizes]
+    assert select_photo(photos).width==expected
+    assert 'private' not in caplog.text
+
+async def test_cache_cleared_after_accept(n,api):
+    item=await ready(n,True); mid=item['id']
+    await n.msg(2,f'/start i_{item["token"]}')
+    assert (await api('GET',f'/api/invites/{mid}/media',2))[0]==200
+    assert n.app.photo_cache.get(item['file_id']) is not None
+    assert (await api('POST',f'/api/invites/{mid}/accept',2))[0]==200
+    assert n.app.photo_cache.get(item['file_id']) is None
+
+async def test_cache_cleared_after_draft_cancel(n,api):
+    mid=await draft(n,True)
+    item=await n.db.invite(mid)
+    assert (await api('GET',f'/api/invites/{mid}/media',1))[0]==200
+    assert n.app.photo_cache.get(item['file_id']) is not None
+    await n.msg(1,'/cancel')
+    assert await n.db.invite(mid) is None
+    assert n.app.photo_cache.get(item['file_id']) is None
 
 async def test_photo_cache_expiry_and_size_bounds(monkeypatch):
     import webapp

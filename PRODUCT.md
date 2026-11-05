@@ -15,7 +15,7 @@ sahifa yopiladi. Bir martalik holat taklifga bog‘langan; yangi havola oldingi
 receiverga ham ishlaydi. Oddiy /start sender bo‘lishni tasdiqlashni taklif qiladi.
 
 ## Operating Context
-Python aiogram, SQLite, aiohttp, ngrok HTTPS. Bitta polling jarayoni.
+Python aiogram, SQLite, aiohttp va konfiguratsiyadagi HTTPS manzili. Bitta bot tokeni uchun bitta polling jarayoni.
 Telegram initData imzosi serverda tekshiriladi. UI o‘zbekcha lotin yozuvida.
 
 ## Capabilities and Constraints

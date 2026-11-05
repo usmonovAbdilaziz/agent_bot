@@ -83,6 +83,7 @@ async def media(request):
     if item['media_kind']=='none': raise ApiProblem('Media yo‘q.',404)
     if item['media_kind']=='photo':
         async with request.app[PHOTO_LOCK]:
+            item=await invite_for(request)
             data=request.app[PHOTO_CACHE].get(item['file_id'])
             if data is None:
                 data=await download_media(app,item['file_id'])
@@ -112,8 +113,10 @@ async def accept(request):
     async with app.lock:
         item=await invite_for(request)
         if request['uid']!=item['receiver']: raise ApiProblem('Faqat oluvchi tasdiqlaydi.',403)
-        if not await app.db.accept(item['id'],request['uid'],count):
-            raise ApiProblem('Taklifni qabul qilib bo‘lmadi.',409)
+        async with request.app[PHOTO_LOCK]:
+            if not await app.db.accept(item['id'],request['uid'],count):
+                raise ApiProblem('Taklifni qabul qilib bo‘lmadi.',409)
+            if item['media_kind']=='photo': request.app[PHOTO_CACHE].remove(item['file_id'])
     await app.notify_acceptance(item['id'])
     return web.json_response({'accepted':True})
 
@@ -129,7 +132,8 @@ def create_web_app(app):
     server=web.Application(middlewares=[media_policy,protect],client_max_size=16384)
     server[BOT_APP]=app
     server[PHOTO_CACHE]=PhotoCache()
-    server[PHOTO_LOCK]=asyncio.Lock()
+    server[PHOTO_LOCK]=app.photo_lock
+    app.photo_cache=server[PHOTO_CACHE]
     async def clear_cache(application):
         application[PHOTO_CACHE].clear()
     server.on_cleanup.append(clear_cache)

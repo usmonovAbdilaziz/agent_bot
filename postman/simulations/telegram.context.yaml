@@ -2,6 +2,13 @@ purpose:
   stands_in_for: Telegram Bot API ning rasm, xabar, callback va polling metodlari
   unblocks: Haqiqiy token va foydalanuvchilarsiz Dispatcher, HTTP va SQLite oqimlarini tekshirish
 assumptions:
+  - id: m1-staging-regression-20261105
+    status: supported
+    claim: The bot starts and completes the existing invitation flow against the repository-owned Telegram stand-in after the staging configuration and cache changes.
+    reason: Real local bot and HTTP application were exercised against the Postman Telegram mock, not live Telegram.
+    verification: Five Postman integration tests passed; simulation logged 156 requests, including startup and polling. Device behavior and real Telegram remain unverified.
+    source: tests/test_postman.py; postman/mocks/telegram/default.js
+    updated_at: '2026-11-05'
   - id: m1-layout-selection-20261105
     status: supported
     claim: Sender can choose a text position before preview and publish, and acceptance still notifies the sender through the local Telegram stand-in.

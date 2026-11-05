@@ -18,8 +18,8 @@ class Config:
     webapp_port: int = 8080
 
     @classmethod
-    def load(cls):
-        load_dotenv(ROOT / '.env')
+    def load(cls, env_file=None):
+        load_dotenv(env_file or ROOT / '.env')
         token = os.getenv('BOT_TOKEN','').strip()
         phone = re.sub(r'\D','',os.getenv('ADMIN_PHONE',''))
         if not token or not phone:

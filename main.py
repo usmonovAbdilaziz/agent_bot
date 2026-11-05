@@ -6,6 +6,7 @@ import hmac
 import html
 import json
 import logging
+import os
 import re
 import time
 from urllib.parse import urlencode
@@ -22,10 +23,10 @@ from invitation_store import InvitationDB, parse_details
 MAX_MEDIA = 20 * 1024 * 1024
 
 def select_photo(photos):
-    suitable = [photo for photo in photos if min(photo.width, photo.height) >= 360]
-    if suitable:
-        return min(suitable, key=lambda photo: photo.width * photo.height)
-    return max(photos, key=lambda photo: photo.width * photo.height)
+    suitable = [photo for photo in photos if photo.width >= 720]
+    selected = min(suitable, key=lambda photo: photo.width) if suitable else max(photos, key=lambda photo: photo.width)
+    logging.warning('Photo dimensions: %d x %d', selected.width, selected.height)
+    return selected
 
 def esc(value):
     return html.escape(str(value or ''))
@@ -43,6 +44,8 @@ class App:
         self.bot, self.db, self.cfg, self.username = bot, db, cfg, username
         self.lock = asyncio.Lock()
         self.notice_lock = asyncio.Lock()
+        self.photo_cache = None
+        self.photo_lock = asyncio.Lock()
         self.ready = False
 
     async def admin(self):
@@ -363,8 +366,12 @@ class App:
             suggestion=await self.db.one('SELECT admin_notified FROM q_suggestions WHERE id=?',(suggestion_id,))
             return await self.send(uid,'Taklifingiz adminga yuborildi.' if suggestion['admin_notified'] else 'Taklifingiz saqlandi; adminga qayta yuboriladi.')
         if cmd=='/cancel' and await self.is_sender(uid):
-            await self.db.run('DELETE FROM q_flows WHERE uid=?',(uid,))
-            await self.db.run("DELETE FROM q_invites WHERE sender=? AND status='draft'",(uid,))
+            async with self.photo_lock:
+                drafts = await self.db.all("SELECT file_id FROM q_invites WHERE sender=? AND status='draft' AND media_kind='photo'", (uid,))
+                await self.db.run('DELETE FROM q_flows WHERE uid=?',(uid,))
+                await self.db.run("DELETE FROM q_invites WHERE sender=? AND status='draft'",(uid,))
+                if self.photo_cache:
+                    for draft in drafts: self.photo_cache.remove(draft['file_id'])
             return await self.home(uid)
         if not await self.is_sender(uid): return
         flow = await self.db.flow(uid)
@@ -535,7 +542,8 @@ def dispatcher(app):
     return dp
 
 async def main():
-    cfg=Config.load()
+    env_file=os.getenv('CONFIG_ENV_FILE')
+    cfg=Config.load(env_file) if env_file else Config.load()
     if not cfg.webapp_url:
         raise ValueError('HTTPS sahifa kerak. Botni python run.py orqali ishga tushiring.')
     db=InvitationDB(cfg.db_path)
