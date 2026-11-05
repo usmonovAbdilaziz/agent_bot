@@ -3,7 +3,7 @@ const fs=require('node:fs/promises');
 const path=require('node:path');
 const assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..');
-const designs=require('../react_src/designs.json');
+const designs=require('../react_src/designs.json').filter(design=>design.type==='fun');
 (async()=>{
  const browser=await chromium.launch({headless:true});
  try {

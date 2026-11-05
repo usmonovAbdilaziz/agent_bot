@@ -283,6 +283,18 @@ function FunInvitation({ invite, onStatus, accepted }) {
   );
 }
 
+// Temporary read-only ceremony view; RSVP is introduced in M4.
+function CeremonyInvitation({ invite, onStatus }) {
+  const position = ['top', 'center', 'bottom'].includes(invite.details?.layout?.text_position) ? invite.details.layout.text_position : 'bottom';
+  return <section className={`invitation design-elegant position-${position}`}>
+    <BackgroundMedia invite={invite} onError={message => onStatus(message, true)} />
+    <div className="scrim" aria-hidden="true" />
+    <div className="invitation-content"><div className="text-panel" tabIndex="0">
+      <h1>{invite.title}</h1><p className="description">{invite.description}</p>
+    </div></div>
+  </section>;
+}
+
 function App() {
   const id = new URLSearchParams(location.search).get('invite');
   const [screen, setScreen] = useState('loading');
@@ -328,7 +340,9 @@ function App() {
       {status.text && <p id="status" role="status" className={status.error ? 'error' : ''}>{status.text}</p>}
       {screen === 'loading' && <div className="loading-card" aria-hidden="true"><span /><span /><span /></div>}
       {screen === 'error' && <button type="button" className="retry" onClick={load}>Qayta urinish</button>}
-      {screen === 'ready' && invite && <FunInvitation invite={invite} onStatus={showStatus} accepted={() => setScreen('accepted')} />}
+      {screen === 'ready' && invite && (invite.type === 'ceremony'
+        ? <CeremonyInvitation invite={invite} onStatus={showStatus} />
+        : <FunInvitation invite={invite} onStatus={showStatus} accepted={() => setScreen('accepted')} />)}
       {screen === 'accepted' && <Success celebrate={invite?.status !== 'accepted'} effect={DESIGNS[invite?.design]?.effect || DESIGNS.classic.effect} />}
     </>
   );

@@ -162,6 +162,7 @@ async def test_minimal_video_invitation_through_postman(tmp_path,notice_error):
             await update(1,'/start')
             await update(1,contact={'phone_number':'+998900000000','first_name':'Admin','user_id':1})
             await update(1,callback='q:self')
+            await update(1,callback='q:ctype:1:fun')
             await update(1,video={'file_id':'video_id','file_unique_id':'unique','duration':60,'width':200,'height':200,'file_size':1024,'mime_type':'video/mp4'})
             await update(1,callback='q:name:1')
             await update(1,'Postman orqali video taklif')
@@ -225,6 +226,7 @@ async def test_minimal_video_invitation_through_postman(tmp_path,notice_error):
                 assert await app.is_sender(2)
                 await update(2,'/start')
                 mid=(await db.flow(2))['invite_id']
+                await update(2,callback=f'q:ctype:{mid}:fun')
                 await update(2,callback=f'q:skip:{mid}')
                 await update(2,callback=f'q:name:{mid}')
                 await update(2,'Ruxsat bilan yaratilgan taklif')
@@ -237,6 +239,7 @@ async def test_minimal_video_invitation_through_postman(tmp_path,notice_error):
                 assert len(await db.all('SELECT * FROM q_invites WHERE sender=2'))==1
                 await update(1,callback='q:self')
                 fresh=(await db.flow(1))['invite_id']
+                await update(1,callback=f'q:ctype:{fresh}:fun')
                 await update(1,callback=f'q:skip:{fresh}')
                 await update(1,callback=f'q:name:{fresh}')
                 await update(1,'Avvalgi receiverga yangi taklif')

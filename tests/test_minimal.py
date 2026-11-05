@@ -39,6 +39,7 @@ async def api(n):
 async def draft(n, media=False, uid=1):
     await n.cb(uid,'q:self' if uid==1 else 'q:new')
     flow=await n.db.flow(uid); mid=flow['invite_id']
+    if flow['stage']=='type': await n.cb(uid,f'q:ctype:{mid}:fun')
     if media: await n.msg(uid,photo=True)
     else: await n.cb(uid,f'q:skip:{mid}')
     await n.cb(uid,f'q:name:{mid}')
@@ -71,7 +72,7 @@ async def test_fun_registry_options_are_available_in_two_column_rows(n):
     await n.cb(1,f'q:design:{mid}')
     rows=json.loads(n.sent(1)[-1]['reply_markup'])['inline_keyboard']
     assert [len(row) for row in rows]==[2,2,2,1]
-    assert {button['callback_data'].split(':')[-1] for row in rows for button in row}==set(DESIGNS)
+    assert {button['callback_data'].split(':')[-1] for row in rows for button in row}=={key for key, value in DESIGNS.items() if value['type']=='fun'}
     for design in ('birthday','neon','newyear'):
         await n.cb(1,f'q:style:{mid}:{design}')
         assert (await n.db.invite(mid))['design']==design
@@ -97,7 +98,7 @@ async def test_phone_sender_requires_own_verified_contact(n):
     assert not await n.app.is_sender(2)
     await n.msg(2,contact={'phone_number':'+998901234567','first_name':'Own','user_id':2})
     assert await n.app.is_sender(2)
-    assert (await n.db.flow(2))['stage']=='media'
+    assert (await n.db.flow(2))['stage']=='type'
     assert '998901234567' not in str(await n.db.all('SELECT * FROM q_profiles'))
     mid=await draft(n,uid=2)
     await n.cb(2,f'q:confirm:{mid}')
@@ -108,7 +109,7 @@ async def test_verified_existing_phone_can_be_selected(n):
     await n.msg(2,contact={'phone_number':'+998901234567','first_name':'Own','user_id':2})
     await n.cb(1,'q:phone'); await n.msg(1,'+998901234567')
     assert await n.app.is_sender(2)
-    assert (await n.db.flow(2))['stage']=='media'
+    assert (await n.db.flow(2))['stage']=='type'
 
 async def test_full_name_optional_media_edit_and_one_confirmation(n):
     original=n.user
@@ -133,7 +134,7 @@ async def test_full_name_optional_media_edit_and_one_confirmation(n):
     assert any('&lt;script&gt;' in x['text'] for x in n.sent(1))
 
 async def test_stale_buttons_duplicate_updates_and_restart(n):
-    await n.cb(1,'q:self'); mid=(await n.db.flow(1))['invite_id']
+    await n.cb(1,'q:self'); mid=(await n.db.flow(1))['invite_id']; await n.cb(1,f'q:ctype:{mid}:fun')
     await n.cb(1,f'q:skip:{mid}')
     await n.msg(1,'Asl ism',message_id=7777)
     await n.msg(1,'Asl ism',message_id=7777)
@@ -150,7 +151,7 @@ async def test_stale_buttons_duplicate_updates_and_restart(n):
 
 @pytest.mark.parametrize('note',[False,True])
 async def test_video_boundary_and_preview(n,note):
-    await n.cb(1,'q:self'); mid=(await n.db.flow(1))['invite_id']
+    await n.cb(1,'q:self'); mid=(await n.db.flow(1))['invite_id']; await n.cb(1,f'q:ctype:{mid}:fun')
     await video(n,61,note=note)
     assert (await n.db.flow(1))['stage']=='media'
     await video(n,60,MAX_MEDIA+1,note=note)
@@ -163,7 +164,7 @@ async def test_video_boundary_and_preview(n,note):
     assert (await n.db.invite(mid))['media_kind']==('video_note' if note else 'video')
 
 async def test_text_bounds_and_unauthorized_confirm(n):
-    await n.cb(1,'q:self'); mid=(await n.db.flow(1))['invite_id']
+    await n.cb(1,'q:self'); mid=(await n.db.flow(1))['invite_id']; await n.cb(1,f'q:ctype:{mid}:fun')
     await n.cb(1,f'q:skip:{mid}')
     await n.msg(1,'X'*121)
     assert (await n.db.flow(1))['stage']=='title'
@@ -222,6 +223,7 @@ async def test_auth_permissions_photo_privacy_and_expiry(n,api):
 async def test_photo_uses_smaller_variant_and_cache_still_enforces_permissions(n,api):
     await n.cb(1,'q:self')
     mid=(await n.db.flow(1))['invite_id']
+    await n.cb(1,f'q:ctype:{mid}:fun')
     n.update_id+=1
     photos=[{'file_id':name,'file_unique_id':name,'width':size,'height':size,'file_size':100}
             for name,size in [('small',320),('medium',800),('large',1280)]]
@@ -422,7 +424,7 @@ async def test_unknown_legacy_design_opens_as_classic_and_can_be_accepted(n, api
 
 @pytest.mark.parametrize('position', ['top','center','bottom'])
 async def test_layout_selection_and_api(n, api, position):
-    await n.cb(1,'q:self'); mid=(await n.db.flow(1))['invite_id']
+    await n.cb(1,'q:self'); mid=(await n.db.flow(1))['invite_id']; await n.cb(1,f'q:ctype:{mid}:fun')
     await n.cb(1,f'q:skip:{mid}'); await n.cb(1,f'q:name:{mid}')
     await n.msg(1,'Matn')
     assert (await n.db.flow(1))['stage']=='layout'

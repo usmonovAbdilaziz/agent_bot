@@ -2,6 +2,11 @@
 import json
 import secrets
 import time
+import re
+import html
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from urllib.parse import urlsplit
 from db import DB
 from designs import valid_design
 
@@ -45,6 +50,44 @@ def parse_details(raw):
     if not isinstance(layout, dict) or layout.get('text_position', 'bottom') not in ('bottom', 'center', 'top'):
         return None
     return value
+
+EVENT_KINDS = ('wedding', 'nikah', 'beshik', 'sunnat', 'fotiha', 'birthday', 'other')
+MAP_HOSTS = {'maps.google.com', 'maps.google.co.uz', 'maps.app.goo.gl', 'goo.gl',
+             'yandex.uz', 'yandex.ru', 'yandex.com', 'maps.yandex.ru', 'maps.yandex.com',
+             '2gis.uz', '2gis.ru', '2gis.com', 'go.2gis.com'}
+
+def valid_map_url(value):
+    if not isinstance(value, str) or not value or len(value)>500 or any(c.isspace() or ord(c)<32 for c in value): return False
+    try:
+        url=urlsplit(value)
+        if url.scheme!='https' or url.hostname not in MAP_HOSTS or url.username is not None or url.password is not None or url.port not in (None,443): return False
+        if url.hostname in {'yandex.uz','yandex.ru','yandex.com'} and not url.path.startswith('/maps'): return False
+        if url.hostname=='goo.gl' and not url.path.startswith('/maps/'): return False
+        return True
+    except ValueError:
+        return False
+
+def valid_ceremony_details(value, *, complete=False, check_date=False):
+    if not isinstance(value,dict) or set(value)-{'event_kind','date','time','address','map_url','program','note','layout'}: return False
+    if parse_details(json.dumps(value)) is None: return False
+    if 'layout' in value and set(value['layout'])-{'text_position'}: return False
+    if complete and not {'event_kind','date','time','address','map_url','program','note','layout'} <= value.keys(): return False
+    if 'event_kind' in value and value['event_kind'] not in EVENT_KINDS: return False
+    if 'date' in value:
+        if not isinstance(value['date'],str) or not re.fullmatch(r'\d{2}\.\d{2}\.\d{4}',value['date']): return False
+        try: date=datetime.strptime(value['date'],'%d.%m.%Y').date()
+        except ValueError: return False
+        if check_date and date < datetime.now(ZoneInfo('Asia/Tashkent')).date(): return False
+    if 'time' in value:
+        if not isinstance(value['time'],str) or not re.fullmatch(r'(?:[01]\d|2[0-3]):[0-5]\d',value['time']): return False
+    for key, limit in (('address',300),('note',500)):
+        if key in value and (not isinstance(value[key],str) or not value[key].strip() or len(value[key])>limit): return False
+    if 'map_url' in value and value['map_url']!='' and not valid_map_url(value['map_url']): return False
+    if 'program' in value and (not isinstance(value['program'],list) or len(value['program'])>20 or any(not isinstance(x,str) or not x.strip() or len(x)>200 for x in value['program']) or sum(map(len,value['program']))>800): return False
+    # Telegram messages are limited to 4096 characters after HTML escaping.
+    texts=[value.get(key,'') for key in ('address','map_url','note')] + value.get('program',[])
+    if sum(len(html.escape(text)) for text in texts)>2800: return False
+    return True
 
 
 class InvitationDB(DB):
@@ -153,16 +196,29 @@ class InvitationDB(DB):
                 name = await (await c.execute('SELECT full_name FROM q_profiles WHERE uid=?',(uid,))).fetchone()
                 cur = await c.execute('INSERT INTO q_invites(sender,title,created_at) VALUES(?,?,?)',(uid,name[0][:120],time.time()))
                 mid = cur.lastrowid
-            await c.execute("INSERT OR IGNORE INTO q_flows VALUES(?,'media',?)",(uid,mid))
+            await c.execute("INSERT OR IGNORE INTO q_flows VALUES(?,'type',?)",(uid,mid))
         return mid
 
     async def invite(self, mid):
         return await self.one('SELECT * FROM q_invites WHERE id=?',(mid,))
 
+    async def update_ceremony_details(self, mid, uid, updates):
+        async with self.connect(True) as c:
+            row=await (await c.execute("SELECT details FROM q_invites WHERE id=? AND sender=? AND status='draft' AND type='ceremony'",(mid,uid))).fetchone()
+            if not row: return False
+            details=parse_details(row['details'])
+            if details is None: return False
+            details.update(updates)
+            if not valid_ceremony_details(details,check_date='date' in updates): return False
+            await c.execute('UPDATE q_invites SET details=? WHERE id=?',(json.dumps(details,ensure_ascii=False),mid))
+            return True
+
     async def publish(self, mid, uid, ttl):
         async with self.connect(True) as c:
             row = await (await c.execute('SELECT * FROM q_invites WHERE id=? AND sender=?',(mid,uid))).fetchone()
-            if not row or not row['description'].strip() or not valid_design(row['design'], row['type']) or parse_details(row['details']) is None:
+            if not row or not row['title'].strip() or len(row['title'])>120 or not row['description'].strip() or not valid_design(row['design'], row['type']) or parse_details(row['details']) is None:
+                return None
+            if row['type']=='ceremony' and (not valid_ceremony_details(parse_details(row['details']),complete=True,check_date=True) or row['description']!=parse_details(row['details'])['note']):
                 return None
             if row['status']=='draft':
                 if not await self._can_publish(c,uid): return None
@@ -203,7 +259,7 @@ class InvitationDB(DB):
     async def accept(self, mid, uid, no_attempts=0):
         async with self.connect(True) as c:
             row = await (await c.execute('SELECT * FROM q_invites WHERE id=? AND receiver=?',(mid,uid))).fetchone()
-            if not row: return False
+            if not row or row['type']!='fun': return False
             if row['status']=='accepted': return True
             if row['status']!='ready' or row['expires_at']<=time.time(): return False
             await c.execute("UPDATE q_invites SET status='accepted',accepted_at=?,no_attempts=? WHERE id=?",(time.time(),no_attempts,mid))

@@ -18,9 +18,11 @@ from aiogram.types import (BotCommand, CallbackQuery, InlineKeyboardButton, Inli
     KeyboardButton, Message, ReplyKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo, MenuButtonCommands)
 from designs import DESIGNS, valid_design
 from config import Config
-from invitation_store import InvitationDB, parse_details
+from invitation_store import InvitationDB, parse_details, valid_ceremony_details, EVENT_KINDS
 
 MAX_MEDIA = 20 * 1024 * 1024
+CEREMONY_LABELS = {'wedding':'To‘y', 'nikah':'Nikoh', 'beshik':'Beshik to‘y', 'sunnat':'Sunnat to‘y', 'fotiha':'Fotiha', 'birthday':'Tug‘ilgan kun', 'other':'Boshqa'}
+CEREMONY_STAGES = ('c_kind','c_title','c_date','c_time','c_address','c_map','c_program','c_note','c_media','c_layout','c_design','c_preview')
 
 def select_photo(photos):
     suitable = [photo for photo in photos if photo.width >= 720]
@@ -269,6 +271,12 @@ class App:
         if flow['stage']=='phone':
             return await self.send(uid,'Senderning telefon raqamini kiriting:\nMasalan: +998901234567',reply_markup=kb([('Orqaga','q:home')]))
         item = await self.db.invite(mid)
+        if flow['stage']=='type':
+            return await self.send(uid,'<b>Taklif turini tanlang:</b>',reply_markup=kb(
+                [('🎈 Ko‘ngilochar',f'q:ctype:{mid}:fun'),('💍 To‘y va marosimlar',f'q:ctype:{mid}:ceremony')],
+                [('Orqaga',f'q:leave:{mid}'),('Bekor qilish',f'q:ccancel:{mid}')]))
+        if flow['stage'].startswith('c_'):
+            return await self.ceremony_prompt(uid,item,flow['stage'])
         if flow['stage']=='media':
             await self.send(uid,'<b>Rasm yoki video yuboring</b>\nVideo: 1 daqiqagacha, 20 MB gacha. Media qo‘shish ixtiyoriy.',
                 reply_markup=kb([('Rasm/videosiz davom etish',f'q:skip:{mid}')]))
@@ -289,6 +297,20 @@ class App:
         if kind=='photo': await self.call(uid,self.bot.send_photo,photo=file_id)
         elif kind=='video': await self.call(uid,self.bot.send_video,video=file_id)
         elif kind=='video_note': await self.call(uid,self.bot.send_video_note,video_note=file_id)
+        if item['type']=='ceremony':
+            details=parse_details(item['details']) or {}
+            program='\n'.join('• '+esc(line) for line in details.get('program',[])) or '—'
+            text=(f'<b>{esc(item["title"])}</b>\nMarosim: {esc(CEREMONY_LABELS.get(details.get("event_kind"),"—"))}'
+                  f'\nSana: {esc(details.get("date","—"))}\nVaqt: {esc(details.get("time","—"))}'
+                  f'\nManzil: {esc(details.get("address","—"))}\nXarita: {esc(details.get("map_url") or "—")}'
+                  f'\nDastur:\n{program}\nQo‘shimcha matn: {esc(details.get("note","—"))}'
+                  f'\nMedia: {esc(kind)}\nMatn joyi: {esc(details.get("layout",{}).get("text_position","bottom"))}'
+                  f'\nDizayn: {esc(DESIGNS.get(item["design"],{}).get("label_uz","—"))}')
+            rows=[]
+            if self.cfg.webapp_url: rows.append([self.web_button('Ko‘rinishini ochish',item['id'])])
+            rows.append([InlineKeyboardButton(text='Tasdiqlash',callback_data=f'q:confirm:{item["id"]}')])
+            rows.append([InlineKeyboardButton(text='Orqaga',callback_data=f'q:cback:{item["id"]}'),InlineKeyboardButton(text='Bekor qilish',callback_data=f'q:ccancel:{item["id"]}')])
+            return await self.send(uid,text,reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
         rows = []
         if self.cfg.webapp_url: rows.append([self.web_button('Ko‘rinishini ochish',item['id'])])
         rows.append([InlineKeyboardButton(text='🎨 Dizaynni tanlash',callback_data=f'q:design:{item["id"]}')])
@@ -296,6 +318,34 @@ class App:
                      InlineKeyboardButton(text='Tahrirlash',callback_data=f'q:edit:{item["id"]}')])
         await self.send(uid,f'<b>{esc(item["title"])}</b>\n\n{esc(item["description"])}\n\nHa  /  Yo‘q\n\nDizayn: {DESIGNS.get(item["design"], DESIGNS["classic"])["label_uz"]}',
             reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+    async def ceremony_prompt(self,uid,item,stage):
+        mid=item['id']
+        labels={'c_title':'Sarlavha yoki ismlarni kiriting (1–120 belgi).', 'c_date':'Sanani DD.MM.YYYY formatida kiriting.',
+                'c_time':'Vaqtni HH:MM formatida kiriting.', 'c_address':'Manzilni kiriting (1–300 belgi).',
+                'c_map':'Xarita HTTPS havolasini yuboring yoki o‘tkazib yuboring.', 'c_program':'Dasturni har bandni alohida qatorda yuboring yoki o‘tkazib yuboring.',
+                'c_note':'Qo‘shimcha matnni kiriting (1–500 belgi).', 'c_media':'Rasm yoki 60 soniyagacha video yuboring yoki o‘tkazib yuboring.',
+                'c_layout':'Matn qayerda joylashsin?', 'c_design':'Dizaynni tanlang.'}
+        rows=[]
+        if stage=='c_kind':
+            choices=[(label,f'q:cevent:{mid}:{key}') for key,label in CEREMONY_LABELS.items()]
+            rows.extend(choices[i:i+2] for i in range(0,len(choices),2))
+        elif stage=='c_layout': rows.extend([[('Yuqorida',f'q:clayout:{mid}:top'),('O‘rtada',f'q:clayout:{mid}:center')],[('Pastda',f'q:clayout:{mid}:bottom'),('O‘tkazib yuborish',f'q:clayout:{mid}:bottom')]])
+        elif stage=='c_design': rows.append([('💍 Nafis',f'q:cdesign:{mid}:ceremony_elegant')])
+        elif stage=='c_preview': return await self.preview(uid,item)
+        if stage in ('c_map','c_program','c_media'): rows.append([('O‘tkazib yuborish',f'q:cskip:{mid}')])
+        rows.append([('Orqaga',f'q:cback:{mid}'),('Bekor qilish',f'q:ccancel:{mid}')])
+        await self.send(uid,'<b>Marosim turini tanlang:</b>' if stage=='c_kind' else esc(labels[stage]),reply_markup=kb(*rows))
+
+    async def cancel_draft(self,uid):
+        async with self.photo_lock:
+            drafts=await self.db.all("SELECT file_id FROM q_invites WHERE sender=? AND status='draft' AND media_kind='photo'",(uid,))
+            await self.db.run('DELETE FROM q_flows WHERE uid=?',(uid,))
+            await self.db.run("DELETE FROM q_invites WHERE sender=? AND status='draft'",(uid,))
+            if self.photo_cache:
+                for draft in drafts: self.photo_cache.remove(draft['file_id'])
+        if uid==await self.admin(): return await self.home(uid)
+        return await self.send(uid,'Qoralama bekor qilindi.',reply_markup=kb([('Yangi taklif','q:new')]))
 
     async def show_link(self, uid, item):
         return await self.send(uid,f'<b>Taklif havolasi tayyor</b>\nhttps://t.me/{self.username}?start=i_{item["token"]}\n\n'
@@ -366,20 +416,29 @@ class App:
             suggestion=await self.db.one('SELECT admin_notified FROM q_suggestions WHERE id=?',(suggestion_id,))
             return await self.send(uid,'Taklifingiz adminga yuborildi.' if suggestion['admin_notified'] else 'Taklifingiz saqlandi; adminga qayta yuboriladi.')
         if cmd=='/cancel' and await self.is_sender(uid):
-            async with self.photo_lock:
-                drafts = await self.db.all("SELECT file_id FROM q_invites WHERE sender=? AND status='draft' AND media_kind='photo'", (uid,))
-                await self.db.run('DELETE FROM q_flows WHERE uid=?',(uid,))
-                await self.db.run("DELETE FROM q_invites WHERE sender=? AND status='draft'",(uid,))
-                if self.photo_cache:
-                    for draft in drafts: self.photo_cache.remove(draft['file_id'])
-            return await self.home(uid)
+            return await self.cancel_draft(uid)
         if not await self.is_sender(uid): return
         flow = await self.db.flow(uid)
         if not flow: return await self.home(uid)
         if flow['stage']=='phone': return await self.choose_phone(uid,text)
         item = await self.db.invite(flow['invite_id'])
         if not item or item['status']!='draft': return await self.home(uid)
-        if flow['stage']=='media':
+        stage=flow['stage']
+        if item['type']=='ceremony' and stage in ('c_title','c_date','c_time','c_address','c_map','c_program','c_note'):
+            if not text or cmd.startswith('/'):
+                return await self.send(uid,'Ma’lumotni matn ko‘rinishida yuboring.')
+            if stage=='c_title':
+                if len(text)>120: return await self.send(uid,'Sarlavha 1–120 belgidan iborat bo‘lsin.')
+                await self.db.run('UPDATE q_invites SET title=? WHERE id=?',(text,item['id']))
+            else:
+                field={'c_date':'date','c_time':'time','c_address':'address','c_map':'map_url','c_program':'program','c_note':'note'}[stage]
+                value=[line.strip() for line in text.splitlines() if line.strip()] if stage=='c_program' else text
+                if not await self.db.update_ceremony_details(item['id'],uid,{field:value}):
+                    return await self.send(uid,'Ma’lumot noto‘g‘ri yoki belgilangan chegaradan oshgan. Qayta kiriting.')
+                if stage=='c_note': await self.db.run('UPDATE q_invites SET description=? WHERE id=?',(text,item['id']))
+            await self.db.stage(uid,CEREMONY_STAGES[CEREMONY_STAGES.index(stage)+1],item['id'])
+            return await self.prompt(uid)
+        if stage in ('media','c_media'):
             media, kind = (select_photo(m.photo), 'photo') if m.photo else (m.video,'video') if m.video else (m.video_note,'video_note') if m.video_note else (None,None)
             if not media:
                 return await self.prompt(uid)
@@ -393,7 +452,7 @@ class App:
             if size is None or size>MAX_MEDIA:
                 return await self.send(uid,'Fayl 20 MB dan oshmasin. Kichikroq fayl yuboring.')
             await self.db.run('UPDATE q_invites SET media_kind=?,file_id=? WHERE id=?',(kind,media.file_id,item['id']))
-            await self.db.stage(uid,'title',item['id'])
+            await self.db.stage(uid,'c_layout' if stage=='c_media' else 'title',item['id'])
             return await self.prompt(uid)
         if flow['stage'] in ('title','description'):
             limit=120 if flow['stage']=='title' else 2000
@@ -471,6 +530,46 @@ class App:
         if action=='new':
             await self.db.begin(uid)
             return await self.prompt(uid)
+        if action in ('ctype','cevent','clayout','cdesign') and len(parts)==4 and parts[2].isdigit():
+            mid=int(parts[2]); item=await self.db.invite(mid); flow=await self.db.flow(uid)
+            if not item or item['sender']!=uid or item['status']!='draft' or not flow or flow['invite_id']!=mid: return
+            choice=parts[3]
+            if action=='ctype' and flow['stage']=='type' and choice in ('fun','ceremony'):
+                if item['type']!=choice:
+                    await self.db.run('UPDATE q_invites SET type=?,design=?,details=?,description=? WHERE id=?',
+                        (choice,'ceremony_elegant' if choice=='ceremony' else 'classic','{}','',mid))
+                elif choice=='ceremony' and not valid_design(item['design'],'ceremony'):
+                    await self.db.run("UPDATE q_invites SET design='ceremony_elegant' WHERE id=?",(mid,))
+                await self.db.stage(uid,'c_kind' if choice=='ceremony' else 'media',mid)
+            elif item['type']=='ceremony' and action=='cevent' and flow['stage']=='c_kind' and choice in EVENT_KINDS:
+                if not await self.db.update_ceremony_details(mid,uid,{'event_kind':choice}): return
+                await self.db.stage(uid,'c_title',mid)
+            elif item['type']=='ceremony' and action=='clayout' and flow['stage']=='c_layout' and choice in ('top','center','bottom'):
+                if not await self.db.update_ceremony_details(mid,uid,{'layout':{'text_position':choice}}): return
+                await self.db.stage(uid,'c_design',mid)
+            elif item['type']=='ceremony' and action=='cdesign' and flow['stage']=='c_design' and valid_design(choice,'ceremony'):
+                await self.db.run('UPDATE q_invites SET design=? WHERE id=?',(choice,mid))
+                await self.db.stage(uid,'c_preview',mid)
+            else: return
+            return await self.prompt(uid)
+        if action in ('cback','cskip','ccancel','leave') and len(parts)==3 and parts[2].isdigit():
+            mid=int(parts[2]); item=await self.db.invite(mid); flow=await self.db.flow(uid)
+            if not item or item['sender']!=uid or item['status']!='draft' or not flow or flow['invite_id']!=mid: return
+            if action=='ccancel': return await self.cancel_draft(uid)
+            if action=='leave' and flow['stage']=='type':
+                if uid==await self.admin(): return await self.home(uid)
+                return await self.send(uid,'Qoralama saqlandi. Davom etish uchun /start bosing.')
+            if item['type']!='ceremony' or flow['stage'] not in CEREMONY_STAGES: return
+            stage=flow['stage']
+            if action=='cback':
+                index=CEREMONY_STAGES.index(stage)
+                await self.db.stage(uid,CEREMONY_STAGES[index-1] if index else 'type',mid)
+            elif action=='cskip' and stage in ('c_map','c_program','c_media'):
+                if stage=='c_media': await self.db.run("UPDATE q_invites SET media_kind='none',file_id='' WHERE id=?",(mid,))
+                else: await self.db.update_ceremony_details(mid,uid,{'map_url':''} if stage=='c_map' else {'program':[]})
+                await self.db.stage(uid,CEREMONY_STAGES[CEREMONY_STAGES.index(stage)+1],mid)
+            else: return
+            return await self.prompt(uid)
         if action=='layout' and len(parts)==4 and parts[2].isdigit():
             mid=int(parts[2])
             item=await self.db.invite(mid)
@@ -510,11 +609,12 @@ class App:
             await self.db.stage(uid,'description',mid)
         elif action=='edit' and flow['stage']=='preview':
             await self.db.stage(uid,'media',mid)
-        elif action=='confirm' and flow['stage']=='preview':
+        elif action=='confirm' and flow['stage'] in ('preview','c_preview'):
             if not self.cfg.webapp_url:
                 return await self.send(uid,'HTTPS sahifa ishlamayapti. Botni run.py orqali ishga tushiring, keyin tasdiqlang.')
             item=await self.db.publish(mid,uid,self.cfg.ttl)
             if item: return await self.deliver_link(q,item)
+            return await self.send(uid,'Taklif ma’lumotlari noto‘g‘ri yoki sana o‘tgan. Orqaga qaytib tekshiring.')
         else: return
         await self.prompt(uid)
 

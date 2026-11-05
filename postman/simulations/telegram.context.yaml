@@ -2,6 +2,13 @@ purpose:
   stands_in_for: Telegram Bot API ning rasm, xabar, callback va polling metodlari
   unblocks: Haqiqiy token va foydalanuvchilarsiz Dispatcher, HTTP va SQLite oqimlarini tekshirish
 assumptions:
+  - id: m3-creation-flow-20261105
+    status: supported
+    claim: Adding the invitation type choice preserves the existing fun bot flow against the repository-owned Telegram stand-in.
+    reason: The actual dispatcher and HTTP bot client were run against the local Postman mock after adding the type-selection callback.
+    verification: Five existing Postman integration cases passed. Ceremony creation and validation were exercised separately with the local Dispatcher HTTP fixture; real Telegram and devices remain unverified.
+    source: tests/test_postman.py; tests/test_ceremony.py; postman/mocks/telegram/default.js
+    updated_at: '2026-11-05'
   - id: m1-staging-regression-20261105
     status: supported
     claim: The bot starts and completes the existing invitation flow against the repository-owned Telegram stand-in after the staging configuration and cache changes.

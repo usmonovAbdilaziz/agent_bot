@@ -5,7 +5,7 @@ import asyncio
 from collections import OrderedDict
 from aiohttp import web
 from designs import valid_design
-from invitation_store import parse_details
+from invitation_store import parse_details, valid_ceremony_details
 from web_common import BOT_APP, STATIC, ApiProblem, protect, page, healthz
 
 MAX_MEDIA=20*1024*1024
@@ -63,9 +63,10 @@ async def invite_for(request):
 async def detail(request):
     item=await invite_for(request)
     details = parse_details(item['details'])
-    if details is None: raise ApiProblem('Taklif ma’lumotlari noto‘g‘ri.',409)
+    if details is None or (item['type']=='ceremony' and not valid_ceremony_details(details,complete=True)):
+        raise ApiProblem('Taklif ma’lumotlari noto‘g‘ri.',409)
     details['layout'] = {**details.get('layout', {}), 'text_position': details.get('layout', {}).get('text_position', 'bottom')}
-    design = item['design'] if valid_design(item['design'], item['type']) else 'classic'
+    design = item['design'] if valid_design(item['design'], item['type']) else ('ceremony_elegant' if item['type']=='ceremony' else 'classic')
     return web.json_response({k:item[k] for k in ('id','title','description','media_kind','status')} | {
         'design':design,
         'type':item['type'], 'details':details,

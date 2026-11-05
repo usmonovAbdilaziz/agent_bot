@@ -138,5 +138,17 @@
         "Balki ha? 😊"
       ]
     }
+  },
+  {
+    "id": "ceremony_elegant",
+    "type": "ceremony",
+    "label_uz": "Nafis",
+    "emoji": "💍",
+    "effect": "none",
+    "behavior": {
+      "evasive_no": false,
+      "show_sticker": false,
+      "rsvp": false
+    }
   }
 ]
