@@ -365,7 +365,7 @@ function CeremonyInvitation({ invite, onStatus }) {
           <h2 id="rsvp-title">{submitted ? 'Javobingiz uchun rahmat!' : 'Siz javob bergansiz'}</h2>
           <p>{response.attending ? `Kelaman · ${response.guests} mehmon` : 'Kela olmayman'}</p>
           <button type="button" onClick={()=>tg?.close()}>Telegramga qaytish</button>
-        </> : <>
+        </> : invite.rsvp_closed ? <h2 id="rsvp-title">Marosim o‘tib ketgan</h2> : <>
           <h2 id="rsvp-title">Tashrifingizni tasdiqlang</h2>
           {invite.preview && <p>Bu ko‘rib chiqish. Javobni oluvchi yuboradi.</p>}
           <div className="rsvp-options">

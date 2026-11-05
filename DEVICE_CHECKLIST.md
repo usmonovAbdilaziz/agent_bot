@@ -31,3 +31,9 @@ Har bir sinov uchun qurilma modeli, OS va Telegram versiyasi, sana, natija va ke
 - [ ] Atlas naqshi, nafis va oltin bezaklar haqiqiy ekranda ko‘rinishini tekshiring.
 - [ ] Bilet perforatsiyasi hamda sana/vaqt qismlari turli ekranlarda to‘g‘ri ko‘rinishini tekshiring.
 - [ ] Har besh dizaynda yorqin va murakkab rasm ustida sarlavha, manzil, dastur va RSVP matni o‘qilishini tekshiring.
+
+## M6 — qurilmada tekshirish
+
+- [ ] Marosim sanasidan keyin yangi RSVP yopilishi va avvalgi javob ko‘rinishini haqiqiy Telegram hisoblarida tekshiring.
+- [ ] Turli qurilmalarda rasm/video fon, tugmalar va uzun matnlarni tekshiring.
+- [ ] Reduced motion va klaviatura/fokus holatini qo‘llab-quvvatlovchi qurilmada tekshiring.
