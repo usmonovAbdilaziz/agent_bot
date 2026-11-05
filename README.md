@@ -172,5 +172,13 @@ Jonli Telegram, qurilmadagi yopilish va Tailscale Funnel alohida qabul sinovini 
 ZIP uchun `python3 package.py`; tokenlar, baza va virtual muhit paketga kirmaydi.
 Windows ZIP: `python3 package.py --windows`. Boshqa kompyuterda ayni bot tokeni
 ishlayotgan bo‘lsa, Windows nusxasini ochishdan oldin uni to‘xtating.
+
+Server `main` branchni har 5 daqiqada tekshiradi. Faqat aynan shu commit uchun
+GitHub Actions `Verify` muvaffaqiyatli tugagach yangi Docker tasviri quriladi va
+health tekshiriladi. Baza va `.env` checkoutdan tashqarida saqlanadi; har bir
+deploy oldidan SQLite backup olinadi. Yangi konteyner tayyor bo‘lmasa avvalgi
+konteyner qayta ishga tushadi. Baza avtomatik orqaga qaytarilmaydi; schema
+migratsiyalari eski versiya bilan mos bo‘lishi kerak. GitHub API limiti yoki
+tarmoq uzilishida keyingi tekshiruvda qayta uriniladi.
 # agent_bot
 # agent_bot

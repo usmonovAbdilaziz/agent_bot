@@ -17,7 +17,7 @@ async function api(path, { method = 'GET', json, blob = false } = {}) {
   try {
     const headers = { 'X-Telegram-Init-Data': tg?.initData || '' };
     if (json !== undefined) headers['Content-Type'] = 'application/json';
-    const response = await fetch(`/api${path}`, {
+    const response = await fetch(new URL(`api${path}`, document.baseURI), {
       method,
       signal: controller.signal,
       headers,
