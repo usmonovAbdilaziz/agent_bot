@@ -94,6 +94,15 @@ def valid_ceremony_details(value, *, complete=False, check_date=False):
     return True
 
 
+def ceremony_passed(details, now=None):
+    try:
+        event_date=datetime.strptime(details['date'],'%d.%m.%Y').date()
+        current=datetime.fromtimestamp(time.time() if now is None else now,ZoneInfo('Asia/Tashkent')).date()
+        return current > event_date
+    except (TypeError, ValueError, KeyError):
+        return True
+
+
 class InvitationDB(DB):
     async def init(self, moderation=True):
         await super().init(moderation)
@@ -258,9 +267,9 @@ class InvitationDB(DB):
     async def claim(self, token, uid, ttl=None):
         async with self.connect(True) as c:
             row = await (await c.execute('SELECT * FROM q_invites WHERE token=?',(token,))).fetchone()
-            if not row or row['status']!='ready' or row['expires_at']<=time.time():
-                return None
-            if row['sender']==uid: return None
+            if not row or row['status']!='ready' or row['sender']==uid: return None
+            if row['expires_at']<=time.time():
+                if row['type']!='ceremony' or not await (await c.execute('SELECT 1 FROM q_rsvps WHERE invite_id=? AND telegram_user_id=?',(row['id'],uid))).fetchone(): return None
             if row['share_mode']=='open' and row['type']=='ceremony':
                 await c.execute('INSERT OR IGNORE INTO q_open_views VALUES(?,?)',(row['id'],uid))
             else:
@@ -300,6 +309,7 @@ class InvitationDB(DB):
             if invite['share_mode']=='open' and not await (await c.execute('SELECT 1 FROM q_open_views WHERE invite_id=? AND telegram_user_id=?',(mid,uid))).fetchone(): return None
             previous=await (await c.execute('SELECT attending,guests,responded_at FROM q_rsvps WHERE invite_id=? AND telegram_user_id=?',(mid,uid))).fetchone()
             if previous: return dict(previous)
+            if ceremony_passed(parse_details(invite['details'])): return 'passed'
             if invite['expires_at']<=time.time(): return None
             count=(await (await c.execute('SELECT count(*) FROM q_rsvps WHERE invite_id=?',(mid,))).fetchone())[0]
             if count>=max_responses: return 'limit'

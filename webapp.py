@@ -5,7 +5,7 @@ import asyncio
 from collections import OrderedDict
 from aiohttp import web
 from designs import valid_design
-from invitation_store import parse_details, valid_ceremony_details
+from invitation_store import parse_details, valid_ceremony_details, ceremony_passed
 from web_common import BOT_APP, STATIC, ApiProblem, protect, page, healthz
 
 MAX_MEDIA=20*1024*1024
@@ -73,7 +73,8 @@ async def detail(request):
     return web.json_response({k:item[k] for k in ('id','title','description','media_kind','status')} | {
         'design':design,
         'type':item['type'], 'share_mode':item['share_mode'], 'details':details,
-        'preview':request['uid']==item['sender'], 'rsvp':dict(response) if response else None})
+        'preview':request['uid']==item['sender'], 'rsvp':dict(response) if response else None,
+        'rsvp_closed':item['type']=='ceremony' and ceremony_passed(details)})
 
 class BoundedBuffer(io.BytesIO):
     def write(self, data):
@@ -146,6 +147,7 @@ async def rsvp(request):
         if item['type']!='ceremony': raise ApiProblem('Bu taklifda RSVP mavjud emas.',409)
         async with request.app[PHOTO_LOCK]:
             response=await app.db.rsvp(item['id'],request['uid'],attending,guests if attending else 0,name,app.cfg.rsvp_max_responses)
+            if response=='passed': raise ApiProblem('Marosim o‘tib ketgan.',409)
             if response=='limit': raise ApiProblem('Bu taklif uchun javoblar soni chegaraga yetdi.',409)
             if response is None: raise ApiProblem('Javobni saqlab bo‘lmadi.',409)
             if item['media_kind']=='photo': request.app[PHOTO_CACHE].remove(item['file_id'])

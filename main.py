@@ -99,7 +99,7 @@ class App:
             if not response: return
             item=await self.db.invite(mid)
             decision='Kelaman' if response['attending'] else 'Kela olmayman'
-            text=(f'💌 <b>Taklifga javob</b>\nTaklif: {esc(item["title"])}\n'
+            text=(f'💌 <b>Taklifga javob</b>\nTaklif #{mid}: {esc(item["title"])}\n'
                   f'Oluvchi: {esc(response["receiver_name"])}\nJavob: {decision}\nMehmonlar soni: {response["guests"]}')
             try: sent=await asyncio.wait_for(self.send(item['sender'],text),timeout=10)
             except (TelegramAPIError,OSError,TimeoutError) as exc:
