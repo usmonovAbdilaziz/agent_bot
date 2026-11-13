@@ -5,8 +5,8 @@
 **Taklif yaratish → To‘y va marosimlar → To‘y** bo‘limida kuyov va kelin
 ismlari, sana (`KK.OO.YYYY`), vaqt (`SS:DD`) va manzil kiritiladi. Hafta kuni
 sanadan aniqlanadi. Sender tayyor rasmni ko‘rib, har bir maydonni tahrirlashi
-va dizaynni tanlashi mumkin. Hozircha bitta dastlabki dizayn mavjud; keyinchalik
-asl matnsiz shablonlar va ularning joylashuvlari qo‘shiladi.
+va dizaynni tanlashi mumkin. “Oltin hoshiyali” va “Oq gullar” shablonlari
+mavjud; kiritilgan ma’lumotlar tanlangan rasmga joylashtiriladi.
 
 Tasdiqlanganda barcha mehmonlarga yuboriladigan bitta havola yaratiladi. Havola
 to‘y kuni oxirigacha (O‘zbekiston vaqti bilan) ishlaydi. Har bir mehmon Telegram

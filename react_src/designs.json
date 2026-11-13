@@ -202,8 +202,20 @@
   {
     "id": "wedding_classic",
     "type": "wedding",
-    "label_uz": "Nafis to‘y",
+    "label_uz": "Oltin hoshiyali",
     "emoji": "💍",
+    "effect": "none",
+    "behavior": {
+      "evasive_no": false,
+      "show_sticker": false,
+      "rsvp": false
+    }
+  },
+  {
+    "id": "wedding_floral",
+    "type": "wedding",
+    "label_uz": "Oq gullar",
+    "emoji": "🌸",
     "effect": "none",
     "behavior": {
       "evasive_no": false,

@@ -118,3 +118,26 @@ async def test_long_valid_names_can_be_published(n):
     item = await n.db.invite(mid)
     assert item['status'] == 'ready' and len(item['title']) <= 120
     assert json.loads(item['details'])['bride'] == 'B' * 60
+
+
+async def test_wedding_design_choice_persists_and_is_shown_to_guest(n, api):
+    mid = await wedding_draft(n)
+    await n.cb(1, f'q:design:{mid}')
+    keyboard = json.loads(n.sent(1)[-1]['reply_markup'])['inline_keyboard']
+    choices = {button['callback_data'] for row in keyboard for button in row}
+    assert {f'q:style:{mid}:wedding_classic', f'q:style:{mid}:wedding_floral'} <= choices
+
+    classic_status, classic = await api('GET', f'/api/invites/{mid}/wedding-image', uid=1)
+    await n.cb(1, f'q:style:{mid}:wedding_floral')
+    assert (await n.db.invite(mid))['design'] == 'wedding_floral'
+    floral_status, floral = await api('GET', f'/api/invites/{mid}/wedding-image', uid=1)
+    assert classic_status == floral_status == 200 and classic != floral
+    assert Image.open(io.BytesIO(floral)).size == (720, 1280)
+
+    await n.cb(1, f'q:confirm:{mid}')
+    item = await n.db.invite(mid)
+    await n.msg(2, f'/start i_{item["token"]}')
+    status, details = await api('GET', f'/api/invites/{mid}', uid=2)
+    assert status == 200 and details['design'] == 'wedding_floral'
+    status, guest_image = await api('GET', f'/api/invites/{mid}/wedding-image', uid=2)
+    assert status == 200 and guest_image == floral

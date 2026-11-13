@@ -6,9 +6,9 @@ assumptions:
     status: supported
     claim: The wedding wizard uploads a generated PNG preview through sendPhoto, publishes a shared invitation and allows two Telegram users to start it.
     reason: Real aiogram Dispatcher, SQLite and HTTP calls were exercised with the repository-owned local Telegram stand-in; multipart data is parsed by the mock.
-    verification: After merging with the RSVP implementation, tests/test_wedding_postman.py and tests/test_postman.py passed (7 cases) against the repository-owned local simulation; its request log included sendPhoto status 200 and both guest start requests. PNG rendering, access control and distinct view counting were also exercised by the local HTTP tests. The stand-in does not prove delivery in a real Telegram client.
+    verification: After adding the two wedding backgrounds, tests/test_wedding_postman.py and tests/test_postman.py passed (7 cases) against the repository-owned local simulation; the default wedding PNG preview was uploaded with sendPhoto and two guests opened the link. The local authenticated HTTP test also checks selection and identical sender/guest images for the floral design. The stand-in does not prove delivery in a real Telegram client.
     source: tests/test_wedding_postman.py; tests/test_wedding.py; postman/mocks/telegram/default.js
-    updated_at: '2026-11-12'
+    updated_at: '2026-11-13'
   - id: m4-rsvp-notification-20261105
     status: supported
     claim: A ceremony RSVP remains stored when the Telegram sender notification fails, and a later retry sends the original receiver name and guest count without changing the response.
