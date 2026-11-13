@@ -47,7 +47,7 @@ async def test_one_approval_one_link_and_stale_buttons_cannot_regrant(n):
     await n.cb(1,f'q:approve:{row["id"]}')
     assert not await n.app.is_sender(2)
     await n.cb(2,'q:new')
-    assert 'ro‘yxatdan' in n.sent(2)[-1]['text']
+    assert 'Boshlash' in n.sent(2)[-1]['reply_markup']
     assert await n.db.begin(2) is None
     assert len(await n.db.all('SELECT * FROM q_invites WHERE sender=2'))==1
     assert (await n.db.invite(mid))['token']==token
@@ -122,6 +122,7 @@ async def test_pending_and_decision_notifications_recover_on_restart(n):
     await restarted.notify_sender_request(row['id'])
     assert 'Admin 1 ta' in n.sent(2)[-1]['text']
     await n.msg(2,'/start')
+    await n.cb(2,'q:new')
     assert (await n.db.flow(2))['stage']=='media'
 
 
@@ -139,6 +140,8 @@ async def test_new_deep_link_preserves_sender_draft_and_previous_receiver_histor
     assert dict(await n.db.flow(2))==flow
     assert (await api('POST',f'/api/invites/{newer["id"]}/accept'))[0]==200
     await n.msg(2,'/start')
+    assert 'Davom etish' in n.sent(2)[-1]['reply_markup']
+    await n.cb(2,'q:continue')
     assert f'q:confirm:{mid}' in n.sent(2)[-1]['reply_markup']
     assert await n.app.is_sender(2)
 

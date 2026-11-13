@@ -7,6 +7,7 @@ from collections import OrderedDict
 from aiohttp import web
 from designs import valid_design
 from web_common import BOT_APP, STATIC, ApiProblem, protect, page, healthz
+from wedding import render_wedding, validated_details
 
 MAX_MEDIA=20*1024*1024
 PHOTO_CACHE_BYTES=16*1024*1024
@@ -53,8 +54,12 @@ async def invite_for(request):
     try: mid=int(request.match_info['mid'])
     except ValueError: raise ApiProblem('Taklif topilmadi.',404)
     item=await app.db.invite(mid)
-    if not item or request['uid'] not in (item['sender'],item['receiver']):
+    if not item:
         raise ApiProblem('Taklif topilmadi.',404)
+    allowed = request['uid'] in (item['sender'],item['receiver'])
+    if item['type']=='ceremony' and not allowed:
+        allowed = bool(await app.db.one('SELECT 1 FROM q_wedding_guests WHERE invite_id=? AND uid=?',(mid,request['uid'])))
+    if not allowed: raise ApiProblem('Taklif topilmadi.',404)
     if request['uid']!=item['sender'] and item['status']!='accepted' and (
             item['status']!='ready' or item['expires_at']<=time.time()):
         raise ApiProblem('Taklif muddati tugagan.',409)
@@ -62,7 +67,7 @@ async def invite_for(request):
 
 async def detail(request):
     item=await invite_for(request)
-    design = item['design'] if valid_design(item['design'], item['type']) else 'classic'
+    design = item['design'] if valid_design(item['design'], item['type']) else ('wedding_classic' if item['type']=='ceremony' else 'classic')
     return web.json_response({k:item[k] for k in ('id','title','description','media_kind','status')} | {
         'design':design,
         'type':item['type'], 'details':json.loads(item['details']),
@@ -88,6 +93,16 @@ async def media(request):
     data=await download_media(app,item['file_id'])
     return web.Response(body=data,content_type='video/mp4')
 
+async def wedding_image(request):
+    item=await invite_for(request)
+    if item['type']!='ceremony': raise ApiProblem('Taklif topilmadi.',404)
+    details=validated_details(item['details'])
+    if not details: raise ApiProblem('Taklif ma’lumotlari xato.',409)
+    data=await asyncio.to_thread(render_wedding,details,item['design'])
+    if request['uid']!=item['sender']:
+        await request.app[BOT_APP].db.run('UPDATE q_wedding_guests SET viewed_at=COALESCE(viewed_at,?) WHERE invite_id=? AND uid=?',(time.time(),item['id'],request['uid']))
+    return web.Response(body=data,content_type='image/png')
+
 async def download_media(app,file_id):
     file=await app.bot.get_file(file_id)
     if not file.file_path or file.file_size is None or file.file_size>MAX_MEDIA:
@@ -108,6 +123,7 @@ async def accept(request):
     # Serialize invitation completion with bot updates; new links remain independent.
     async with app.lock:
         item=await invite_for(request)
+        if item['type']=='ceremony': raise ApiProblem('Bu taklif javob talab qilmaydi.',409)
         if request['uid']!=item['receiver']: raise ApiProblem('Faqat oluvchi tasdiqlaydi.',403)
         if not await app.db.accept(item['id'],request['uid'],count):
             raise ApiProblem('Taklifni qabul qilib bo‘lmadi.',409)
@@ -134,6 +150,7 @@ def create_web_app(app):
     server.router.add_get('/healthz',healthz)
     server.router.add_get('/api/invites/{mid}',detail)
     server.router.add_get('/api/invites/{mid}/media',media)
+    server.router.add_get('/api/invites/{mid}/wedding-image',wedding_image)
     server.router.add_post('/api/invites/{mid}/accept',accept)
     server.router.add_static('/assets',STATIC,show_index=False)
     return server

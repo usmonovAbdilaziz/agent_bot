@@ -1,5 +1,23 @@
 # Qadam — bitta taklif, bitta javob
 
+## To‘y va marosimlar
+
+**Taklif yaratish → To‘y va marosimlar → To‘y** bo‘limida kuyov va kelin
+ismlari, sana (`KK.OO.YYYY`), vaqt (`SS:DD`) va manzil kiritiladi. Hafta kuni
+sanadan aniqlanadi. Sender tayyor rasmni ko‘rib, har bir maydonni tahrirlashi
+va dizaynni tanlashi mumkin. Hozircha bitta dastlabki dizayn mavjud; keyinchalik
+asl matnsiz shablonlar va ularning joylashuvlari qo‘shiladi.
+
+Tasdiqlanganda barcha mehmonlarga yuboriladigan bitta havola yaratiladi. Havola
+to‘y kuni oxirigacha (O‘zbekiston vaqti bilan) ishlaydi. Har bir mehmon Telegram
+orqali sahifadagi rasmni ochsa, **Mening takliflarim** ichida bir kishi sifatida
+sanalanadi; sender preview'i va takroriy ochishlar hisoblanmaydi. Boshqa joyga
+yuborilgan rasm yoki screenshot ko‘rishlari hisoblanmaydi. Ruxsat sarflangandan
+keyin ham sender o‘z takliflari va ko‘rishlar sonini ko‘ra oladi.
+
+**Banket** tanlovi hozircha tayyorlanish holatida. Marosim takliflarida
+ko‘ngilochar “Ha / Yo‘q” tugmalari mavjud emas.
+
 Admin senderni tanlaydi. Sender ixtiyoriy rasm/video, ism va tavsif tayyorlaydi.
 Receiver taklifni Telegram ichidagi sahifada ochadi. **Ha** → mushaklar →
 **Tanlovingiz uchun rahmat!** → sahifa yopiladi. Bir martalik cheklov har bir

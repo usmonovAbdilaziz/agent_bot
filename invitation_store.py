@@ -3,6 +3,7 @@ import secrets
 import time
 from db import DB
 from designs import valid_design
+from wedding import validated_details, expires_at
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS q_profiles(uid INTEGER PRIMARY KEY, full_name TEXT NOT NULL, phone_hash TEXT UNIQUE);
@@ -24,6 +25,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS q_one_draft ON q_invites(sender) WHERE status=
 CREATE TABLE IF NOT EXISTS q_flows(uid INTEGER PRIMARY KEY, stage TEXT NOT NULL, invite_id INTEGER);
 CREATE TABLE IF NOT EXISTS q_done(uid INTEGER PRIMARY KEY, completed_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS q_seen(uid INTEGER NOT NULL, message_id INTEGER NOT NULL, PRIMARY KEY(uid,message_id));
+CREATE TABLE IF NOT EXISTS q_wedding_guests(invite_id INTEGER NOT NULL, uid INTEGER NOT NULL,
+ viewed_at REAL, PRIMARY KEY(invite_id,uid));
 CREATE TABLE IF NOT EXISTS q_accept_notices(
  invite_id INTEGER PRIMARY KEY, status TEXT NOT NULL DEFAULT 'pending');
 CREATE TABLE IF NOT EXISTS q_sender_requests(
@@ -54,6 +57,11 @@ class InvitationDB(DB):
                 await c.execute('ALTER TABLE q_sender_requests ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1')
             if 'phone' not in request_columns:
                 await c.execute("ALTER TABLE q_sender_requests ADD COLUMN phone TEXT NOT NULL DEFAULT ''")
+            # One-time privacy cleanup for requests already decided before retention was added.
+            cleanup = await (await c.execute("SELECT 1 FROM settings WHERE key='q_decided_request_phone_cleanup'")).fetchone()
+            if not cleanup:
+                await c.execute("UPDATE q_sender_requests SET phone='' WHERE status!='pending'")
+                await c.execute("INSERT INTO settings VALUES('q_decided_request_phone_cleanup','1')")
             await c.execute('INSERT OR IGNORE INTO q_sender_credits(uid,remaining) SELECT uid,1 FROM q_senders')
             migrated = await (await c.execute("SELECT 1 FROM settings WHERE key='q_one_link_permissions'")).fetchone()
             if not migrated:
@@ -86,7 +94,7 @@ class InvitationDB(DB):
             user = await (await c.execute('SELECT is_blocked FROM users WHERE tg_id=?',(row['uid'],))).fetchone()
             if approve and (not user or user[0]): return None
             status = 'approved' if approve else 'denied'
-            await c.execute('UPDATE q_sender_requests SET status=? WHERE id=?',(status,request_id))
+            await c.execute("UPDATE q_sender_requests SET status=?,phone='' WHERE id=?",(status,request_id))
             if approve:
                 await self._grant(c,row['uid'],row['quantity'])
             return row['uid']
@@ -129,7 +137,7 @@ class InvitationDB(DB):
     async def stage(self, uid, stage, mid=None):
         await self.run('INSERT OR REPLACE INTO q_flows VALUES(?,?,?)', (uid,stage,mid))
 
-    async def begin(self, uid):
+    async def begin(self, uid, invite_type='fun'):
         async with self.connect(True) as c:
             if not await self._can_publish(c,uid): return None
             row = await (await c.execute("SELECT id FROM q_invites WHERE sender=? AND status='draft'",(uid,))).fetchone()
@@ -137,9 +145,11 @@ class InvitationDB(DB):
                 mid = row['id']
             else:
                 name = await (await c.execute('SELECT full_name FROM q_profiles WHERE uid=?',(uid,))).fetchone()
-                cur = await c.execute('INSERT INTO q_invites(sender,title,created_at) VALUES(?,?,?)',(uid,name[0][:120],time.time()))
+                design = 'wedding_classic' if invite_type == 'ceremony' else 'classic'
+                cur = await c.execute('INSERT INTO q_invites(sender,title,created_at,type,design) VALUES(?,?,?,?,?)',(uid,name[0][:120],time.time(),invite_type,design))
                 mid = cur.lastrowid
-            await c.execute("INSERT OR IGNORE INTO q_flows VALUES(?,'media',?)",(uid,mid))
+            stage = 'wedding_groom' if invite_type == 'ceremony' else 'media'
+            await c.execute('INSERT OR IGNORE INTO q_flows VALUES(?,?,?)',(uid,stage,mid))
         return mid
 
     async def invite(self, mid):
@@ -148,11 +158,14 @@ class InvitationDB(DB):
     async def publish(self, mid, uid, ttl):
         async with self.connect(True) as c:
             row = await (await c.execute('SELECT * FROM q_invites WHERE id=? AND sender=?',(mid,uid))).fetchone()
-            if not row or not row['description'].strip() or not valid_design(row['design'], row['type']):
+            details = validated_details(row['details']) if row and row['type']=='ceremony' else None
+            if not row or not valid_design(row['design'], row['type']) or (row['type']=='fun' and not row['description'].strip()) or (row['type']=='ceremony' and not details):
                 return None
             if row['status']=='draft':
                 if not await self._can_publish(c,uid): return None
-                await c.execute("UPDATE q_invites SET status='ready',token=?,expires_at=? WHERE id=?",(secrets.token_urlsafe(18),time.time()+ttl,mid))
+                expiry = expires_at(details) if details else time.time()+ttl
+                if expiry <= time.time(): return None
+                await c.execute("UPDATE q_invites SET status='ready',token=?,expires_at=? WHERE id=?",(secrets.token_urlsafe(18),expiry,mid))
                 admin = await (await c.execute("SELECT value FROM settings WHERE key='admin'")).fetchone()
                 if not admin or admin[0]!=str(uid):
                     credit = await (await c.execute('SELECT remaining FROM q_sender_credits WHERE uid=?',(uid,))).fetchone()
@@ -169,8 +182,12 @@ class InvitationDB(DB):
             row = await (await c.execute('SELECT * FROM q_invites WHERE token=?',(token,))).fetchone()
             if not row or row['status']!='ready' or row['expires_at']<=time.time():
                 return None
-            if row['sender']==uid or row['receiver'] not in (None,uid):
+            if row['sender']==uid:
                 return None
+            if row['type']=='ceremony':
+                await c.execute('INSERT OR IGNORE INTO q_wedding_guests(invite_id,uid) VALUES(?,?)',(row['id'],uid))
+                return row['id']
+            if row['receiver'] not in (None,uid): return None
             await c.execute('UPDATE q_invites SET receiver=? WHERE id=? AND receiver IS NULL',(uid,row['id']))
             return row['id']
 

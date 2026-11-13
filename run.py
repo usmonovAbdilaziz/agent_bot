@@ -39,7 +39,7 @@ def ensure_pip(executable):
 
 def dependencies_available(executable):
     result = subprocess.run(
-        [str(executable), '-c', 'import dotenv, aiogram, aiosqlite'],
+        [str(executable), '-c', 'import dotenv, aiogram, aiosqlite, PIL'],
         cwd=ROOT, capture_output=True,
     )
     return result.returncode == 0

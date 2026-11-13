@@ -5,13 +5,14 @@ import hashlib
 import argparse
 
 ROOT=Path(__file__).resolve().parent
-FILES=['designs.py','config.py','invitation_store.py','web_common.py','legacy_bot.py','legacy_webapp.py','API_CONTRACT.md','PRODUCT.md','DESIGN.md','main.py','db.py','run.py','launch.py','webapp.py','package.py','requirements.txt','requirements-dev.txt','package.json','package-lock.json','vite.config.js',
+FILES=['designs.py','wedding.py','config.py','invitation_store.py','web_common.py','legacy_bot.py','legacy_webapp.py','API_CONTRACT.md','PRODUCT.md','DESIGN.md','main.py','db.py','run.py','launch.py','webapp.py','package.py','requirements.txt','requirements-dev.txt','package.json','package-lock.json','vite.config.js',
        '.env.example','.gitignore','README.md','TEST_REPORT.md','pytest.ini','start.command','start.bat',
        'start_windows.ps1','setup_config.py','WINDOWS_README.txt']
 
 
 def build(windows=False):
     files=[ROOT/name for name in FILES]
+    files += [p for p in (ROOT/'wedding_assets').rglob('*') if p.is_file()]
     files += [p for folder in ('tests','postman','web','web_minimal','react_src') for p in (ROOT/folder).rglob('*')
               if p.is_file() and '__pycache__' not in p.parts and p.suffix in ('.py','.js','.jsx','.yaml','.json','.html','.css','.cjs','.md')]
     target=ROOT.parent/('agent_bot_windows.zip' if windows else 'agent_bot_minimal.zip')

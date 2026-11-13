@@ -202,7 +202,7 @@ async def test_minimal_video_invitation_through_postman(tmp_path,notice_error):
             assert before==after
             await update(2,'/start')
             async with http.get(URL+'/_test/calls') as response: resumed=await response.json()
-            assert 'ro‘yxatdan' in resumed[-1]['body']['text']
+            assert 'Taklifnoma yaratish' in resumed[-1]['body']['text']
             assert {'sendMessage','sendVideo','answerCallbackQuery','editMessageReplyMarkup'}<={c['method'] for c in after}
             assert not await db.all('SELECT * FROM sessions')
             if notice_error is None:
@@ -223,6 +223,7 @@ async def test_minimal_video_invitation_through_postman(tmp_path,notice_error):
                 await update(1,callback=f'q:approve:{request["id"]}')
                 assert await app.is_sender(2)
                 await update(2,'/start')
+                await update(2,callback='q:new')
                 mid=(await db.flow(2))['invite_id']
                 await update(2,callback=f'q:skip:{mid}')
                 await update(2,callback=f'q:name:{mid}')

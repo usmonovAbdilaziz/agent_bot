@@ -1,5 +1,13 @@
 # Minimal taklif — 2026-11-03
 
+Wedding (`type=ceremony`) uses a shared token. Each non-sender visitor must open
+the bot deep link, which registers access without counting a view. Authenticated
+GET `/api/invites/{id}/wedding-image` renders the PNG and records one view per
+Telegram user; preview by the owner does not count. Other users receive 404,
+and expired invitations cannot be opened. Sender can see the count in the bot.
+Wedding tokens expire at 23:59:59 on the event date, Uzbekistan time. The
+single-recipient fun invitation and acceptance behavior remains unchanged.
+
 Active entrypoint: main.py. Existing chat/relay code remains in legacy_bot.py and
 legacy_webapp.py solely for regression and rollback; no legacy routes are mounted.
 Existing database tables and records are preserved. New q_* tables store this flow.

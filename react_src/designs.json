@@ -1,6 +1,62 @@
 [
-  {"id":"classic","type":"fun","label_uz":"Sodda","emoji":"🤍","effect":"fireworks","behavior":{"evasive_no":true,"show_sticker":true,"rsvp":false}},
-  {"id":"romantic","type":"fun","label_uz":"Romantik","emoji":"🌸","effect":"fireworks","behavior":{"evasive_no":true,"show_sticker":true,"rsvp":false}},
-  {"id":"playful","type":"fun","label_uz":"Quvnoq","emoji":"🎉","effect":"fireworks","behavior":{"evasive_no":true,"show_sticker":true,"rsvp":false}},
-  {"id":"elegant","type":"fun","label_uz":"Nafis","emoji":"✨","effect":"fireworks","behavior":{"evasive_no":true,"show_sticker":true,"rsvp":false}}
+  {
+    "id": "classic",
+    "type": "fun",
+    "label_uz": "Sodda",
+    "emoji": "🤍",
+    "effect": "fireworks",
+    "behavior": {
+      "evasive_no": true,
+      "show_sticker": true,
+      "rsvp": false
+    }
+  },
+  {
+    "id": "romantic",
+    "type": "fun",
+    "label_uz": "Romantik",
+    "emoji": "🌸",
+    "effect": "fireworks",
+    "behavior": {
+      "evasive_no": true,
+      "show_sticker": true,
+      "rsvp": false
+    }
+  },
+  {
+    "id": "playful",
+    "type": "fun",
+    "label_uz": "Quvnoq",
+    "emoji": "🎉",
+    "effect": "fireworks",
+    "behavior": {
+      "evasive_no": true,
+      "show_sticker": true,
+      "rsvp": false
+    }
+  },
+  {
+    "id": "elegant",
+    "type": "fun",
+    "label_uz": "Nafis",
+    "emoji": "✨",
+    "effect": "fireworks",
+    "behavior": {
+      "evasive_no": true,
+      "show_sticker": true,
+      "rsvp": false
+    }
+  },
+  {
+    "id": "wedding_classic",
+    "type": "ceremony",
+    "label_uz": "Nafis to‘y",
+    "emoji": "💍",
+    "effect": "none",
+    "behavior": {
+      "evasive_no": false,
+      "show_sticker": false,
+      "rsvp": false
+    }
+  }
 ]

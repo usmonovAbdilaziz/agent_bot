@@ -75,3 +75,6 @@ main > section { animation: arrive 420ms ease-out both; }
   h1 { margin-top: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { main > section, .loading-card span { animation: none; } button:not(:disabled), .arena .no:not(:disabled) { transition: none; } button:not(:disabled):active { transform: none; } }
+.wedding-invitation { width: min(100%, 720px); margin: 0 auto; text-align: center; }
+.wedding-invitation img { display: block; width: 100%; height: auto; border-radius: 12px; }
+.wedding-invitation p { margin: 1rem; }

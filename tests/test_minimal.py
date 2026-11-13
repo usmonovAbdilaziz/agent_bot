@@ -73,10 +73,49 @@ async def video(n,duration=60,size=1024,note=False):
 
 async def test_admin_has_two_choices_and_only_admin_assigns(n):
     menu=json.loads(n.sent(1)[-1]['reply_markup'])['inline_keyboard']
-    assert [b['text'] for row in menu for b in row]==['O‘zim','Boshqa raqam','Sender so‘rovlari','Takliflar']
+    assert [b['text'] for row in menu for b in row]==['Taklif yaratish','Mening takliflarim','Yordam','Admin']
+    await n.cb(1,'q:admin')
+    admin_menu=json.loads(n.sent(1)[-1]['reply_markup'])['inline_keyboard']
+    assert len([b for row in admin_menu for b in row]) <= 5
     await n.msg(2,'/start'); await n.cb(2,'q:self'); await n.cb(2,'q:phone')
     assert not await n.db.all('SELECT * FROM q_invites')
     assert not await n.db.flow(2)
+
+async def test_start_returns_to_menu_and_draft_has_continue(n):
+    await n.db.run('INSERT INTO q_senders(uid) VALUES(2)')
+    await n.db.run('INSERT INTO q_sender_credits(uid,remaining) VALUES(2,1)')
+    await n.msg(2,'/start')
+    await n.db.run('INSERT OR IGNORE INTO q_senders(uid) VALUES(2)')
+    await n.cb(2,'q:new')
+    await n.msg(2,'/start')
+    labels=[b['text'] for row in json.loads(n.sent(2)[-1]['reply_markup'])['inline_keyboard'] for b in row]
+    assert labels[0]=='Davom etish' and len(labels)<=3
+
+async def test_invite_list_and_legacy_callback_home(n):
+    await n.db.run("INSERT INTO q_invites(sender,title,status,token,created_at) VALUES(2,'Taklif','ready','abc',1)")
+    await n.db.run('INSERT INTO q_senders(uid) VALUES(2)')
+    await n.cb(2,'q:invites')
+    assert 'Mening takliflarim' in n.sent(2)[-1]['text']
+    await n.cb(2,'legacy:old-menu-action')
+    assert 'Bosh menyu' in n.sent(2)[-1]['text']
+
+async def test_old_callback_returns_user_to_current_home(n):
+    before = len(n.sent(2))
+    await n.cb(2, 'legacy:old-menu-action')
+    assert len(n.sent(2)) == before + 1
+    assert 'Taklifnoma yaratish' in n.sent(2)[-1]['text']
+
+async def test_sender_decision_clears_phone_and_migration_is_idempotent(n):
+    await n.msg(2, '/start')
+    await n.cb(2, 'q:request')
+    await n.msg(2, contact={'phone_number': '+998901234567', 'first_name': 'Own', 'user_id': 2})
+    await n.cb(2, 'q:quota:1')
+    request = await n.db.one("SELECT id,phone FROM q_sender_requests WHERE uid=2")
+    assert request['phone'] == '+998901234567'
+    await n.db.decide_sender(request['id'], 1, True)
+    assert (await n.db.one('SELECT phone FROM q_sender_requests WHERE id=?', (request['id'],)))['phone'] == ''
+    await n.db.init()
+    assert (await n.db.one('SELECT phone FROM q_sender_requests WHERE id=?', (request['id'],)))['phone'] == ''
 
 async def test_phone_sender_requires_own_verified_contact(n):
     await n.cb(1,'q:phone'); await n.msg(1,'+998901234567')
@@ -129,7 +168,9 @@ async def test_stale_buttons_duplicate_updates_and_restart(n):
     assert (await n.db.flow(1))['stage']=='description'
     n.app=App(n.bot,n.db,n.cfg,'test_agent_bot'); n.dp=dispatcher(n.app)
     await n.msg(1,'/start')
-    assert 'Tavsif yuboring' in n.sent(1)[-1]['text']
+    assert 'Bosh menyu' in n.sent(1)[-1]['text']
+    await n.cb(1,'q:continue')
+    assert 'Taklif matni' in n.sent(1)[-1]['text']
     await n.msg(1,'Davom etgan tavsif')
     await n.cb(1,f'q:confirm:{mid}')
     assert (await n.db.invite(mid))['status']=='ready'
@@ -180,7 +221,7 @@ async def test_receiver_completion_is_per_invitation_and_start_offers_sender(n,a
     assert not await n.db.all('SELECT * FROM sessions')
     n.app=App(n.bot,n.db,n.cfg,'test_agent_bot'); n.dp=dispatcher(n.app)
     await n.msg(2,'/start')
-    assert 'ro‘yxatdan' in n.sent(2)[-1]['text']
+    assert 'Boshlash' in n.sent(2)[-1]['reply_markup']
     await n.msg(2,f'/start i_{item["token"]}')
     assert 'ishlatilgan' in n.sent(2)[-1]['text']
     newer=await ready(n)
@@ -264,7 +305,7 @@ async def test_no_media_endpoint_and_pending_resume(n,api):
     item=await ready(n)
     await n.msg(2,f'/start i_{item["token"]}')
     await n.msg(2,'/start')
-    assert 'ro‘yxatdan' in n.sent(2)[-1]['text']
+    assert 'Boshlash' in n.sent(2)[-1]['reply_markup']
     await n.msg(2,f'/start i_{item["token"]}')
     assert 'Taklifni ochish' in n.sent(2)[-1]['reply_markup']
     assert (await api('GET',f'/api/invites/{item["id"]}/media',2))[0]==404

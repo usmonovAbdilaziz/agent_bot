@@ -236,6 +236,27 @@ function Success({ celebrate }) {
   );
 }
 
+function WeddingInvitation({ invite, onStatus }) {
+  const [image, setImage] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    let url;
+    onStatus('Taklifnoma yuklanmoqda…');
+    api(`/invites/${invite.id}/wedding-image`, { blob: true }).then(blob => {
+      if (cancelled) return;
+      url = URL.createObjectURL(blob);
+      setImage(url);
+      onStatus('');
+    }).catch(error => { if (!cancelled) onStatus(messageFor(error), true); });
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
+  }, [invite.id, onStatus, attempt]);
+  return <section className="wedding-invitation">
+    {image ? <img src={image} alt="To‘y taklifnomasi" /> : <button type="button" className="retry" onClick={() => setAttempt(value => value + 1)}>Qayta yuklash</button>}
+    {invite.preview && <p>Oluvchiga shunday ko‘rinadi. Tasdiqlash uchun botga qayting.</p>}
+  </section>;
+}
+
 function Invitation({ invite, onStatus, accepted }) {
   const [attempts, increment] = useAttemptCounter(invite.id);
   const [sticker, setSticker] = useState(false);
@@ -324,7 +345,9 @@ function App() {
       {status.text && <p id="status" role="status" className={status.error ? 'error' : ''}>{status.text}</p>}
       {screen === 'loading' && <div className="loading-card" aria-hidden="true"><span /><span /><span /></div>}
       {screen === 'error' && <button type="button" className="retry" onClick={load}>Qayta urinish</button>}
-      {screen === 'ready' && invite && <Invitation invite={invite} onStatus={showStatus} accepted={() => setScreen('accepted')} />}
+      {screen === 'ready' && invite && (invite.type === 'ceremony'
+        ? <WeddingInvitation invite={invite} onStatus={showStatus} />
+        : <Invitation invite={invite} onStatus={showStatus} accepted={() => setScreen('accepted')} />)}
       {screen === 'accepted' && <Success celebrate={invite?.status !== 'accepted'} />}
     </>
   );

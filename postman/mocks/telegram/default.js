@@ -11,6 +11,24 @@ const reply = (res, status, value) => {
 const server = http.createServer(async (req, res) => {
   const path = req.url.split('?')[0];
   let body = req.body;
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('multipart/form-data') && (!body || typeof body === 'string')) {
+    let data = body;
+    if (!data) {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      data = Buffer.concat(chunks);
+    }
+    const form = await new Response(data, {headers: {'content-type': contentType}}).formData();
+    body = {};
+    for (const [name, value] of form.entries()) {
+      if (typeof value === 'string') body[name] = value;
+      else {
+        const bytes = Buffer.from(await value.arrayBuffer());
+        body[name] = {filename: value.name, size: bytes.length, png: bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))};
+      }
+    }
+  }
   if (!body) {
     let raw = '';
     for await (const chunk of req) raw += chunk;
