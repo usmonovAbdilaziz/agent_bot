@@ -17,7 +17,7 @@ const image = execFileSync('python3', ['-c', "import sys; from wedding import re
       await page.route('http://qadam.test/**', async route => {
         const url = new URL(route.request().url());
         if (url.pathname.endsWith('/wedding-image')) return route.fulfill({ contentType: 'image/png', body: image });
-        if (url.pathname.startsWith('/api/')) return route.fulfill({ contentType: 'application/json', json: { id: 1, type: 'ceremony', design: 'wedding_classic', status: 'ready', preview: false } });
+        if (url.pathname.startsWith('/api/')) return route.fulfill({ contentType: 'application/json', json: { id: 1, type: 'wedding', design: 'wedding_classic', status: 'ready', preview: false } });
         const file = url.pathname === '/' ? 'index.html' : path.basename(url.pathname);
         return route.fulfill({ contentType: file.endsWith('.js') ? 'application/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html', body: await fs.readFile(path.join(root,'web_minimal',file)) });
       });

@@ -45,7 +45,7 @@ async def test_wedding_shared_link_views_and_access(n,api):
     assert not await n.db.all('SELECT * FROM q_wedding_guests')
     await n.cb(1,f'q:confirm:{mid}')
     item=await n.db.invite(mid)
-    assert item['type']=='ceremony' and item['token']
+    assert item['type']=='wedding' and item['token']
     assert (await api('GET',f'/api/invites/{mid}',uid=2))[0]==404
     for uid in (2,3):
         await n.msg(uid,f'/start i_{item["token"]}')
@@ -76,3 +76,45 @@ async def test_wedding_sender_can_see_stats_after_credit_spent(n):
     assert 'Mening takliflarim' in n.sent(2)[-1]['reply_markup']
     await n.cb(2,f'q:invite:{mid}')
     assert 'Ko‘rganlar: <b>0 kishi</b>' in n.sent(2)[-1]['text']
+
+
+async def test_wedding_and_existing_ceremony_work_together(n, api):
+    from test_ceremony import start, fill_to_map, finish
+
+    ceremony_id = await start(n)
+    await fill_to_map(n, ceremony_id)
+    await finish(n, ceremony_id, mode='open')
+    await n.cb(1, f'q:confirm:{ceremony_id}')
+    ceremony = await n.db.invite(ceremony_id)
+    wedding_id = await wedding_draft(n)
+    await n.cb(1, f'q:confirm:{wedding_id}')
+    wedding = await n.db.invite(wedding_id)
+    for invite in (ceremony, wedding):
+        await n.msg(2, f'/start i_{invite["token"]}')
+    assert (await api('GET', f'/api/invites/{ceremony_id}', uid=2))[1]['type'] == 'ceremony'
+    assert (await api('POST', f'/api/invites/{ceremony_id}/rsvp', uid=2, json={'attending': 1, 'guests': 2}))[0] == 200
+    assert (await api('GET', f'/api/invites/{wedding_id}/wedding-image', uid=2))[0] == 200
+    assert (await api('POST', f'/api/invites/{wedding_id}/rsvp', uid=2, json={'attending': 1, 'guests': 2}))[0] == 409
+    assert len(await n.db.all('SELECT * FROM q_rsvps')) == 1
+    assert len(await n.db.all('SELECT * FROM q_wedding_guests WHERE viewed_at IS NOT NULL')) == 1
+
+
+async def test_wedding_image_uses_media_rate_limit(n, api):
+    mid = await wedding_draft(n)
+    await n.cb(1, f'q:confirm:{mid}')
+    item = await n.db.invite(mid)
+    await n.msg(2, f'/start i_{item["token"]}')
+    n.cfg.media_rate_limit = 1
+    assert (await api('GET', f'/api/invites/{mid}/wedding-image', uid=2))[0] == 200
+    assert (await api('GET', f'/api/invites/{mid}/wedding-image', uid=2))[0] == 429
+
+
+async def test_long_valid_names_can_be_published(n):
+    mid = await wedding_draft(n)
+    for field, value in (('groom', 'A' * 60), ('bride', 'B' * 60)):
+        await n.cb(1, f'q:wedit:{mid}:{field}')
+        await n.msg(1, value)
+    await n.cb(1, f'q:confirm:{mid}')
+    item = await n.db.invite(mid)
+    assert item['status'] == 'ready' and len(item['title']) <= 120
+    assert json.loads(item['details'])['bride'] == 'B' * 60

@@ -10,5 +10,8 @@
 !web_minimal/**
 
 !designs.py
+!wedding.py
+!wedding_assets/
+!wedding_assets/**
 !react_src/
 !react_src/designs.json

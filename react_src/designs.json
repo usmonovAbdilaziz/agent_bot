@@ -4,11 +4,19 @@
     "type": "fun",
     "label_uz": "Sodda",
     "emoji": "🤍",
-    "effect": "fireworks",
+    "effect": "confetti",
     "behavior": {
       "evasive_no": true,
       "show_sticker": true,
-      "rsvp": false
+      "rsvp": false,
+      "phrase_at": 5,
+      "sticker_at": 10,
+      "strong_at": 20,
+      "phrases": [
+        "Ishonchingiz komilmi? 🥺",
+        "Yana bir o‘ylab ko‘ring! 💭",
+        "Balki ha? 😊"
+      ]
     }
   },
   {
@@ -16,11 +24,19 @@
     "type": "fun",
     "label_uz": "Romantik",
     "emoji": "🌸",
-    "effect": "fireworks",
+    "effect": "hearts",
     "behavior": {
       "evasive_no": true,
       "show_sticker": true,
-      "rsvp": false
+      "rsvp": false,
+      "phrase_at": 5,
+      "sticker_at": 10,
+      "strong_at": 20,
+      "phrases": [
+        "Ishonchingiz komilmi? 🥺",
+        "Yana bir o‘ylab ko‘ring! 💭",
+        "Balki ha? 😊"
+      ]
     }
   },
   {
@@ -28,11 +44,19 @@
     "type": "fun",
     "label_uz": "Quvnoq",
     "emoji": "🎉",
-    "effect": "fireworks",
+    "effect": "confetti",
     "behavior": {
       "evasive_no": true,
       "show_sticker": true,
-      "rsvp": false
+      "rsvp": false,
+      "phrase_at": 5,
+      "sticker_at": 10,
+      "strong_at": 20,
+      "phrases": [
+        "Ishonchingiz komilmi? 🥺",
+        "Yana bir o‘ylab ko‘ring! 💭",
+        "Balki ha? 😊"
+      ]
     }
   },
   {
@@ -40,16 +64,144 @@
     "type": "fun",
     "label_uz": "Nafis",
     "emoji": "✨",
-    "effect": "fireworks",
+    "effect": "neon-glow",
     "behavior": {
       "evasive_no": true,
       "show_sticker": true,
+      "rsvp": false,
+      "phrase_at": 5,
+      "sticker_at": 10,
+      "strong_at": 20,
+      "phrases": [
+        "Ishonchingiz komilmi? 🥺",
+        "Yana bir o‘ylab ko‘ring! 💭",
+        "Balki ha? 😊"
+      ]
+    }
+  },
+  {
+    "id": "birthday",
+    "type": "fun",
+    "label_uz": "Tug‘ilgan kun",
+    "emoji": "🎂",
+    "effect": "balloons",
+    "behavior": {
+      "evasive_no": true,
+      "show_sticker": true,
+      "rsvp": false,
+      "phrase_at": 5,
+      "sticker_at": 10,
+      "strong_at": 20,
+      "phrases": [
+        "Ishonchingiz komilmi? 🥺",
+        "Yana bir o‘ylab ko‘ring! 💭",
+        "Balki ha? 😊"
+      ]
+    }
+  },
+  {
+    "id": "neon",
+    "type": "fun",
+    "label_uz": "Neon",
+    "emoji": "⚡",
+    "effect": "neon-glow",
+    "behavior": {
+      "evasive_no": true,
+      "show_sticker": true,
+      "rsvp": false,
+      "phrase_at": 5,
+      "sticker_at": 10,
+      "strong_at": 20,
+      "phrases": [
+        "Ishonchingiz komilmi? 🥺",
+        "Yana bir o‘ylab ko‘ring! 💭",
+        "Balki ha? 😊"
+      ]
+    }
+  },
+  {
+    "id": "newyear",
+    "type": "fun",
+    "label_uz": "Yangi yil",
+    "emoji": "❄️",
+    "effect": "snow",
+    "behavior": {
+      "evasive_no": true,
+      "show_sticker": true,
+      "rsvp": false,
+      "phrase_at": 5,
+      "sticker_at": 10,
+      "strong_at": 20,
+      "phrases": [
+        "Ishonchingiz komilmi? 🥺",
+        "Yana bir o‘ylab ko‘ring! 💭",
+        "Balki ha? 😊"
+      ]
+    }
+  },
+  {
+    "id": "atlas",
+    "type": "ceremony",
+    "label_uz": "Atlas",
+    "emoji": "🔷",
+    "effect": "none",
+    "behavior": {
+      "evasive_no": false,
+      "show_sticker": false,
+      "rsvp": false
+    }
+  },
+  {
+    "id": "nafis",
+    "type": "ceremony",
+    "label_uz": "Nafis",
+    "emoji": "🌿",
+    "effect": "none",
+    "behavior": {
+      "evasive_no": false,
+      "show_sticker": false,
+      "rsvp": false
+    }
+  },
+  {
+    "id": "gold",
+    "type": "ceremony",
+    "label_uz": "Oltin",
+    "emoji": "✨",
+    "effect": "none",
+    "behavior": {
+      "evasive_no": false,
+      "show_sticker": false,
+      "rsvp": false
+    }
+  },
+  {
+    "id": "envelope",
+    "type": "ceremony",
+    "label_uz": "Konvert",
+    "emoji": "💌",
+    "effect": "none",
+    "behavior": {
+      "evasive_no": false,
+      "show_sticker": false,
+      "rsvp": false
+    }
+  },
+  {
+    "id": "ticket",
+    "type": "ceremony",
+    "label_uz": "Bilet",
+    "emoji": "🎟",
+    "effect": "none",
+    "behavior": {
+      "evasive_no": false,
+      "show_sticker": false,
       "rsvp": false
     }
   },
   {
     "id": "wedding_classic",
-    "type": "ceremony",
+    "type": "wedding",
     "label_uz": "Nafis to‘y",
     "emoji": "💍",
     "effect": "none",

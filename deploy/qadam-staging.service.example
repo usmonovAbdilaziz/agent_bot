@@ -1,0 +1,16 @@
+[Unit]
+Description=Qadam separate staging bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=REPLACE_USER
+WorkingDirectory=/REPLACE_PATH/agent_bot-m1
+ExecStart=/REPLACE_PATH/agent_bot-m1/.venv/bin/python /REPLACE_PATH/agent_bot-m1/start_staging.py
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

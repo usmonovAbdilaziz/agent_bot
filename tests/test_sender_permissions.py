@@ -123,7 +123,7 @@ async def test_pending_and_decision_notifications_recover_on_restart(n):
     assert 'Admin 1 ta' in n.sent(2)[-1]['text']
     await n.msg(2,'/start')
     await n.cb(2,'q:new')
-    assert (await n.db.flow(2))['stage']=='media'
+    assert (await n.db.flow(2))['stage']=='type'
 
 
 async def test_new_deep_link_preserves_sender_draft_and_previous_receiver_history(n,api):

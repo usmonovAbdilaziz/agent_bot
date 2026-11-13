@@ -96,17 +96,24 @@ Bot tokeni o‘zgarsa sender telefonini qayta tasdiqlash/tanlash kerak bo‘ladi
 
 ## Sender
 
-1. **Rasm / video**: rasm, MP4 video yoki dumaloq video xabar yuboring. Video
+1. **Rasm / video**: rasm, MP4 video yoki Telegram video xabar yuboring (Mini App’da fon to‘liq ekranda, aylana emas). Video
    60 soniyagacha, fayl 20 MiB gacha. Media kerak bo‘lmasa **Rasm/videosiz davom etish**.
 2. **Ism**: Telegram full name avtomatik chiqadi. **Shu ismni qoldirish** yoki
    o‘zingiz yangi ism/matn yozing (1–120 belgi).
-3. **Tavsif**: taklif matnini yuboring (1–2000 belgi).
+3. **Tavsif**: taklif matnini yuboring (1–2000 belgi); keyin matnni yuqori, o‘rta yoki pastga joylashtiring yoki standart pastki joyni tanlang.
 4. **Ko‘rib chiqish**: media va matn chatda chiqadi. **Ko‘rinishini ochish** receiver
    sahifasining aynan o‘zini ko‘rsatadi. **Dizaynni tanlash** orqali Sodda, Romantik,
-   Quvnoq yoki Nafis ko‘rinishni tanlang va preview orqali tekshiring. **Tahrirlash**
+   Quvnoq, Nafis, Tug‘ilgan kun, Neon yoki Yangi yil ko‘rinishini tanlang va preview orqali tekshiring. **Tahrirlash**
    bosqichlarni qayta ochadi.
-5. **Tasdiqlash**: receiver uchun bitta bir martalik havola yaratadi. Adminning
+5. **Tasdiqlash**: fun receiver uchun bitta bir martalik havola yaratadi. Adminning
    ikkinchi tasdig‘i yo‘q. Takror bosish yangi havola yaratmaydi.
+
+`ENABLE_CEREMONY=true` bo‘lsa yangi qoralamada **Ko‘ngilochar** yoki **To‘y va marosimlar** tanlanadi; standart o‘chiq holatda fun oqimi darhol boshlanadi.
+Marosim oqimida tur, sarlavha, sana, vaqt, manzil, ixtiyoriy xarita va dastur,
+qo‘shimcha matn, ixtiyoriy media, matn joyi va Atlas, Nafis, Gold, Envelope yoki Ticket dizayni tanlanadi. Sana
+Toshkent sanasiga nisbatan o‘tgan bo‘lmasligi kerak. Mini Appda marosim ma’lumotlari,
+xarita va taqvim havolalari hamda bir martalik RSVP ko‘rinadi. Kelmaslik uchun
+mehmonlar soni 0 saqlanadi; kelishda 1–10 tanlanadi. Shaxsiy havola bitta oluvchiga bog‘lanadi; ochiq havolani bir nechta mehmon ochishi mumkin.
 
 Qoralama va bosqich SQLite bazasida saqlanadi. Uzilishdan keyin `/start` bilan
 davom eting. `/cancel` tugallanmagan qoralamani bekor qiladi. Bu yordamchi buyruq
@@ -115,14 +122,15 @@ asosiy menyuga qo‘shilmagan.
 ## Receiver
 
 Havola `https://t.me/BOT?start=i_TOKEN` ko‘rinishida. Birinchi receiver `/start`
-bosganda havola unga birikadi. Bot faqat **Taklifni ochish** tugmasini yuboradi.
+bosganda fun yoki shaxsiy ceremony havolasi unga birikadi; ochiq ceremony havolasi ko‘p foydalanuvchiga ishlaydi. Bot faqat **Taklifni ochish** tugmasini yuboradi.
 Telegram `/start` javobidan Mini Appni avtomatik ochishga ruxsat bermaydi:
 foydalanuvchi bu tugmani bir marta bosadi.
 
-Sahifada dumaloq media (agar bor bo‘lsa), ism, tavsif, **Ha / Yo‘q** turadi.
+Sahifada rasm/video butun ekran foni bo‘ladi; media bo‘lmasa dizayn gradienti ko‘rinadi. Uning ustida ism, tavsif va **Ha / Yo‘q** turadi.
 Video ovozsiz o‘ynaydi; **Ovozni yoqish** bilan ovoz yoqiladi. Yo‘q tugmasi
-sichqoncha/teginish/klaviaturadan qochadi. Har 10 urinishda 😡 stiker ko‘rinishidagi
-reaksiya vaqtincha chiqadi va urinishlar davom etadi. Telegramning yopish tugmasi
+sichqoncha/teginish/klaviaturadan qochadi, Ha esa kattalashadi. Beshinchi urinishdan
+iboralar, har o‘ninchi urinishda vaqtinchalik 😡 va yigirmanchi urinishdan kuchliroq
+reaksiya ko‘rinadi. Reduced motion sozlamasida titrash o‘chiriladi. Telegramning yopish tugmasi
 mavjud; rad etishga majburlovchi server amali yo‘q.
 
 **Ha** faqat server javobni saqlagach bayram animatsiyasini chiqaradi va 2.8 soniyadan
@@ -140,7 +148,7 @@ oldin botni ishlatgan bo‘lsa ham. Oddiy `/start` ruxsatli senderning qoralamas
 davom ettiradi yoki sender bo‘lish taklifini ko‘rsatadi. Eski qabul qilingan
 havola qayta ishlamaydi. Oddiy receiver matnlariga javob berilmaydi.
 
-Havola odatda 48 soat amal qiladi. Egasi o‘z havolasini ishlatib yubormaydi.
+Fun havolasi odatda 48 soat amal qiladi; ceremony muddati quyida berilgan. Egasi o‘z havolasini ishlatib yubormaydi.
 Hali javob bermagan receiver eski taklif havolasini qayta ochsa, yangi HTTPS manzilli
 tugma oladi. Eski xabardagi tugma eski manzilga bog‘langan.
 
@@ -200,3 +208,23 @@ migratsiyalari eski versiya bilan mos bo‘lishi kerak. GitHub API limiti yoki
 tarmoq uzilishida keyingi tekshiruvda qayta uriniladi.
 # agent_bot
 # agent_bot
+
+### Ceremony ochiq havolasi
+
+Yangi ceremony uchun standart ochiq havola: bot rejim tanlashda havola egalariga manzil va vaqt ochiqligini ko‘rsatadi. Tasdiqlangandan keyin Telegram ulashish tugmasi mavjud. Shaxsiy rejim bitta oluvchiga biriktiriladi. `/guests` faqat senderning ceremony takliflari va sahifalangan RSVP ro‘yxatini ko‘rsatadi. Dastlabki 50 ta javobga alohida bildirishnoma yuboriladi; qolganlari ro‘yxatda ko‘rinadi.
+
+`RSVP_MAX_RESPONSES` (standart `500`) va `RSVP_RATE_LIMIT_PER_MINUTE` (standart `30`) sozlanadi. Tezlik chegarasi jarayon xotirasida saqlanadi. Mavjud takliflar migratsiyada shaxsiy qoladi va avvalgi RSVP oluvchiga bog‘lanadi.
+
+Ceremony dizaynlari: `atlas`, `nafis`, `gold`, `envelope`, `ticket`. Ilgari saqlangan `ceremony_elegant` qiymati `nafis`ga migratsiya qilinadi. Aktivlar lokal CSS, tizim serif shriftlari va mavjud rasm/video fonidan iborat; tashqi shrift yoki CDN ishlatilmaydi.
+
+### Taklif turini tanlash
+
+Ruxsatli sender `/check` buyrug‘i bilan taklif yaratishni boshlaydi; admin menyusida **Taklif turini tanlash** tugmasi ham mavjud. `ENABLE_CEREMONY=true` bo‘lsa fun yoki marosim turi tanlanadi; o‘chiq bo‘lsa fun oqimi ochiladi. Tugallanmagan qoralama saqlanadi va `/start` bilan davom ettiriladi.
+
+### Release flag va dizayn qo‘shish
+
+`ENABLE_CEREMONY=false` standart qiymat: yangi taklif fun oqimiga o‘tadi. `true` yangi ceremony yaratishni ko‘rsatadi; oldin yaratilgan ceremony havolalari va RSVP flagdan qat’i nazar ishlaydi. Lokal sozlama loyiha `.env` faylida; production deployer `/home/ubuntu/apps/agent_bot/.env` faylini Docker `--env-file` bilan o‘qiydi. Prod’da yoqish uchun operator shu faylda `ENABLE_CEREMONY=true` belgilaydi va keyingi Verified `main` deployida konteynerni yangidan yaratadi; `docker restart` env faylini qayta o‘qimaydi. Keyin health va test taklifni tekshiradi. Hech qachon tokenni hujjatga yozmang.
+
+Yangi dizayn: `react_src/designs.json`ga yagona ID, tur, nom va behavior yozing; `react_src/style.css`da kontrastli CSS qo‘shing; fun effekt kerak bo‘lsa `react_src/main.jsx`dagi lokal effektga ulang (ceremony hazil effektlarisiz); registry, Playwright, kontrast va reduced-motion testlarini yangilang, `npm run build` bilan `web_minimal`ni qayta yarating. Deploy va bazani qaytarish: [ROLLBACK.md](ROLLBACK.md).
+
+Ceremony havolasi Toshkent vaqti bilan marosim kuni tugaganidan keyin yana 24 soatgacha, nashrdan ko‘pi bilan 400 kungacha amal qiladi. Avvalgi havolalarning saqlangan muddati o‘zgarmaydi; avval javob bergan mehmon o‘z javobini keyin ham ko‘radi. Fun havolasining sozlangan TTL muddati o‘zgarmaydi. Media cache xotirada 16 MiB jami, 2 MiB har bir fayl va 15 daqiqa bilan cheklangan; katta videolar cache qilinmaydi. `MEDIA_DOWNLOAD_CONCURRENCY` (standart 4), `MEDIA_RATE_LIMIT_PER_MINUTE` (standart 120) sozlanadi; Range so‘rovi 206 qaytaradi.

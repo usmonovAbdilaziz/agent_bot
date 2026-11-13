@@ -1,11 +1,11 @@
 """Receiver-only Mini App API. Acceptance never starts a relay session."""
 import io
-import json
 import time
 import asyncio
 from collections import OrderedDict
 from aiohttp import web
-from designs import valid_design
+from designs import DESIGNS, valid_design
+from invitation_store import parse_details, valid_ceremony_details, ceremony_passed
 from web_common import BOT_APP, STATIC, ApiProblem, protect, page, healthz
 from wedding import render_wedding, validated_details
 
@@ -16,6 +16,9 @@ PHOTO_CACHE_ENTRIES=64
 PHOTO_CACHE_TTL=15*60
 PHOTO_CACHE=web.AppKey('photo_cache', object)
 PHOTO_LOCK=web.AppKey('photo_lock', object)
+MEDIA_SEMAPHORE=web.AppKey('media_semaphore', object)
+MEDIA_FLIGHTS=web.AppKey('media_flights', object)
+MEDIA_RATES=web.AppKey('media_rates', object)
 
 class PhotoCache:
     def __init__(self):
@@ -54,24 +57,29 @@ async def invite_for(request):
     try: mid=int(request.match_info['mid'])
     except ValueError: raise ApiProblem('Taklif topilmadi.',404)
     item=await app.db.invite(mid)
-    if not item:
+    permitted = item and (request['uid'] in (item['sender'],item['receiver']) or (item['type']=='ceremony' and item['share_mode']=='open' and await app.db.one('SELECT 1 FROM q_open_views WHERE invite_id=? AND telegram_user_id=?',(mid,request['uid']))) or (item['type']=='wedding' and await app.db.one('SELECT 1 FROM q_wedding_guests WHERE invite_id=? AND uid=?',(mid,request['uid']))))
+    if not permitted:
         raise ApiProblem('Taklif topilmadi.',404)
-    allowed = request['uid'] in (item['sender'],item['receiver'])
-    if item['type']=='ceremony' and not allowed:
-        allowed = bool(await app.db.one('SELECT 1 FROM q_wedding_guests WHERE invite_id=? AND uid=?',(mid,request['uid'])))
-    if not allowed: raise ApiProblem('Taklif topilmadi.',404)
-    if request['uid']!=item['sender'] and item['status']!='accepted' and (
+    answered = item['type']=='ceremony' and await app.db.one('SELECT 1 FROM q_rsvps WHERE invite_id=? AND telegram_user_id=?',(item['id'],request['uid']))
+    if request['uid']!=item['sender'] and not answered and item['status']!='accepted' and (
             item['status']!='ready' or item['expires_at']<=time.time()):
         raise ApiProblem('Taklif muddati tugagan.',409)
     return item
 
 async def detail(request):
     item=await invite_for(request)
-    design = item['design'] if valid_design(item['design'], item['type']) else ('wedding_classic' if item['type']=='ceremony' else 'classic')
+    details = parse_details(item['details'])
+    if details is None or (item['type']=='ceremony' and not valid_ceremony_details(details,complete=True)):
+        raise ApiProblem('Taklif ma’lumotlari noto‘g‘ri.',409)
+    details['layout'] = {**details.get('layout', {}), 'text_position': details.get('layout', {}).get('text_position', 'bottom')}
+    if item['design'] in DESIGNS and not valid_design(item['design'],item['type']): raise ApiProblem('Taklif dizayni turiga mos emas.',409)
+    design = item['design'] if valid_design(item['design'], item['type']) else ('nafis' if item['type']=='ceremony' else 'wedding_classic' if item['type']=='wedding' else 'classic')
+    response = await request.app[BOT_APP].db.one('SELECT attending,guests,responded_at FROM q_rsvps WHERE invite_id=? AND telegram_user_id=?',(item['id'],request['uid'])) if item['type']=='ceremony' else None
     return web.json_response({k:item[k] for k in ('id','title','description','media_kind','status')} | {
         'design':design,
-        'type':item['type'], 'details':json.loads(item['details']),
-        'preview':request['uid']==item['sender']})
+        'type':item['type'], 'share_mode':item['share_mode'], 'details':details,
+        'preview':request['uid']==item['sender'], 'rsvp':dict(response) if response else None,
+        'rsvp_closed':item['type']=='ceremony' and ceremony_passed(details)})
 
 class BoundedBuffer(io.BytesIO):
     def write(self, data):
@@ -79,26 +87,64 @@ class BoundedBuffer(io.BytesIO):
             raise ApiProblem('Media 20 MB dan katta.',413)
         return super().write(data)
 
+def limit_media_requests(request):
+    app=request.app[BOT_APP]
+    now=time.monotonic(); rates=request.app[MEDIA_RATES]
+    for uid in list(rates):
+        if rates[uid][-1]<=now-60: del rates[uid]
+    times=rates.setdefault(request['uid'],[])
+    times[:]=[t for t in times if t>now-60]
+    if len(times)>=getattr(app.cfg,'media_rate_limit',120): raise ApiProblem('Media so‘rovlari juda ko‘p. Bir daqiqadan so‘ng qayta urinib ko‘ring.',429)
+    times.append(now)
+
 async def media(request):
     app=request.app[BOT_APP]
     item=await invite_for(request)
     if item['media_kind']=='none': raise ApiProblem('Media yo‘q.',404)
-    if item['media_kind']=='photo':
-        async with request.app[PHOTO_LOCK]:
-            data=request.app[PHOTO_CACHE].get(item['file_id'])
-            if data is None:
-                data=await download_media(app,item['file_id'])
-                request.app[PHOTO_CACHE].put(item['file_id'],data)
-        return web.Response(body=data,content_type='image/jpeg')
-    data=await download_media(app,item['file_id'])
-    return web.Response(body=data,content_type='video/mp4')
+    limit_media_requests(request)
+    cache=request.app[PHOTO_CACHE]; flights=request.app[MEDIA_FLIGHTS]; key=item['file_id']
+    async with request.app[PHOTO_LOCK]:
+        data=cache.get(key)
+        if data is None:
+            task=flights.get(key)
+            if task is None:
+                async def fetch():
+                    async with request.app[MEDIA_SEMAPHORE]:
+                        result=await download_media(app,key)
+                    async with request.app[PHOTO_LOCK]: cache.put(key,result)
+                    return result
+                task=asyncio.create_task(fetch()); flights[key]=task
+                def finish(done):
+                    if flights.get(key) is done: flights.pop(key,None)
+                    if not done.cancelled(): done.exception()
+                task.add_done_callback(finish)
+    if data is None: data=await asyncio.shield(task)
+    content_type='image/jpeg' if item['media_kind']=='photo' else 'video/mp4'
+    headers={'Accept-Ranges':'bytes'}
+    range_header=request.headers.get('Range')
+    if range_header:
+        import re
+        match=re.fullmatch(r'bytes=(\d*)-(\d*)',range_header.strip())
+        if not match or (not match[1] and not match[2]):
+            return web.Response(status=416,headers={'Content-Range':f'bytes */{len(data)}','Accept-Ranges':'bytes'})
+        if match[1]:
+            start=int(match[1]); end=min(int(match[2]) if match[2] else len(data)-1,len(data)-1)
+        else:
+            suffix=int(match[2]); start=max(0,len(data)-suffix); end=len(data)-1
+        if start>=len(data) or start>end:
+            return web.Response(status=416,headers={'Content-Range':f'bytes */{len(data)}','Accept-Ranges':'bytes'})
+        headers['Content-Range']=f'bytes {start}-{end}/{len(data)}'
+        return web.Response(status=206,body=memoryview(data)[start:end+1],content_type=content_type,headers=headers)
+    return web.Response(body=data,content_type=content_type,headers=headers)
 
 async def wedding_image(request):
     item=await invite_for(request)
-    if item['type']!='ceremony': raise ApiProblem('Taklif topilmadi.',404)
+    if item['type']!='wedding': raise ApiProblem('Taklif topilmadi.',404)
     details=validated_details(item['details'])
     if not details: raise ApiProblem('Taklif ma’lumotlari xato.',409)
-    data=await asyncio.to_thread(render_wedding,details,item['design'])
+    limit_media_requests(request)
+    async with request.app[MEDIA_SEMAPHORE]:
+        data=await asyncio.to_thread(render_wedding,details,item['design'])
     if request['uid']!=item['sender']:
         await request.app[BOT_APP].db.run('UPDATE q_wedding_guests SET viewed_at=COALESCE(viewed_at,?) WHERE invite_id=? AND uid=?',(time.time(),item['id'],request['uid']))
     return web.Response(body=data,content_type='image/png')
@@ -123,12 +169,43 @@ async def accept(request):
     # Serialize invitation completion with bot updates; new links remain independent.
     async with app.lock:
         item=await invite_for(request)
-        if item['type']=='ceremony': raise ApiProblem('Bu taklif javob talab qilmaydi.',409)
+        if item['type'] in ('ceremony','wedding'): raise ApiProblem('Bu taklif javob talab qilmaydi.',409)
         if request['uid']!=item['receiver']: raise ApiProblem('Faqat oluvchi tasdiqlaydi.',403)
-        if not await app.db.accept(item['id'],request['uid'],count):
-            raise ApiProblem('Taklifni qabul qilib bo‘lmadi.',409)
+        async with request.app[PHOTO_LOCK]:
+            if not await app.db.accept(item['id'],request['uid'],count):
+                raise ApiProblem('Taklifni qabul qilib bo‘lmadi.',409)
+            if item['media_kind']=='photo': request.app[PHOTO_CACHE].remove(item['file_id'])
     await app.notify_acceptance(item['id'])
     return web.json_response({'accepted':True})
+
+async def rsvp(request):
+    app=request.app[BOT_APP]
+    now=time.monotonic()
+    app.rsvp_requests={uid:times for uid,times in app.rsvp_requests.items() if times and now-times[-1]<60}
+    times=app.rsvp_requests.setdefault(request['uid'],[])
+    times[:]=[t for t in times if now-t<60]
+    if len(times)>=app.cfg.rsvp_rate_limit: raise ApiProblem('So‘rovlar juda ko‘p. Bir daqiqadan so‘ng qayta urinib ko‘ring.',429)
+    times.append(now)
+    try: payload=await request.json()
+    except (ValueError,TypeError): raise ApiProblem('Javob formati noto‘g‘ri.',400)
+    if not isinstance(payload,dict): raise ApiProblem('Javob formati noto‘g‘ri.',400)
+    attending=payload.get('attending'); guests=payload.get('guests')
+    if type(attending) is not int or attending not in (0,1) or type(guests) is not int or (attending==1 and not 1<=guests<=10) or (attending==0 and guests not in (0,1)):
+        raise ApiProblem('Javob yoki mehmonlar soni noto‘g‘ri.',400)
+    person=request['telegram_user']
+    name=' '.join(filter(None,[person.first_name,person.last_name])) or 'Oluvchi'
+    async with app.lock:
+        item=await invite_for(request)
+        if item['type']!='ceremony': raise ApiProblem('Bu taklifda RSVP mavjud emas.',409)
+        if item['sender']==request['uid'] or (item['share_mode']=='single' and item['receiver']!=request['uid']): raise ApiProblem('Faqat oluvchi javob beradi.',403)
+        async with request.app[PHOTO_LOCK]:
+            response=await app.db.rsvp(item['id'],request['uid'],attending,guests if attending else 0,name,app.cfg.rsvp_max_responses)
+            if response=='passed': raise ApiProblem('Marosim o‘tib ketgan.',409,'rsvp_closed')
+            if response=='limit': raise ApiProblem('Bu taklif uchun javoblar soni chegaraga yetdi.',409)
+            if response is None: raise ApiProblem('Javobni saqlab bo‘lmadi.',409)
+            if item['media_kind']=='photo': request.app[PHOTO_CACHE].remove(item['file_id'])
+    await app.notify_rsvp(item['id'],request['uid'])
+    return web.json_response({'rsvp':response})
 
 @web.middleware
 async def media_policy(request, handler):
@@ -142,8 +219,14 @@ def create_web_app(app):
     server=web.Application(middlewares=[media_policy,protect],client_max_size=16384)
     server[BOT_APP]=app
     server[PHOTO_CACHE]=PhotoCache()
-    server[PHOTO_LOCK]=asyncio.Lock()
+    server[PHOTO_LOCK]=app.photo_lock
+    server[MEDIA_SEMAPHORE]=asyncio.Semaphore(getattr(app.cfg,'media_concurrency',4))
+    server[MEDIA_FLIGHTS]={}
+    server[MEDIA_RATES]={}
+    app.photo_cache=server[PHOTO_CACHE]
     async def clear_cache(application):
+        for task in list(application[MEDIA_FLIGHTS].values()): task.cancel()
+        if application[MEDIA_FLIGHTS]: await asyncio.gather(*list(application[MEDIA_FLIGHTS].values()),return_exceptions=True)
         application[PHOTO_CACHE].clear()
     server.on_cleanup.append(clear_cache)
     server.router.add_get('/',page)
@@ -152,6 +235,7 @@ def create_web_app(app):
     server.router.add_get('/api/invites/{mid}/media',media)
     server.router.add_get('/api/invites/{mid}/wedding-image',wedding_image)
     server.router.add_post('/api/invites/{mid}/accept',accept)
+    server.router.add_post('/api/invites/{mid}/rsvp',rsvp)
     server.router.add_static('/assets',STATIC,show_index=False)
     return server
 

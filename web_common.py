@@ -12,8 +12,8 @@ BOT_APP = web.AppKey('bot_app', object)
 
 
 class ApiProblem(Exception):
-    def __init__(self, message, status=400):
-        self.message, self.status = message, status
+    def __init__(self, message, status=400, code=None):
+        self.message, self.status, self.code = message, status, code
 
 
 @web.middleware
@@ -37,9 +37,10 @@ async def protect(request, handler):
                 raise ApiProblem('Botda xabar olish o‘chirilgan yoki foydalanish cheklangan. /start ni tekshiring.', 403)
             request['uid'] = signed.user.id
             request['user'] = user
+            request['telegram_user'] = signed.user
         response = await handler(request)
     except ApiProblem as exc:
-        response = web.json_response({'error': exc.message}, status=exc.status)
+        response = web.json_response({'error': exc.message, **({'code': exc.code} if exc.code else {})}, status=exc.status)
     except web.HTTPException as exc:
         if request.path.startswith('/api/'):
             response = web.json_response({'error': 'So‘rov bajarilmadi. Ma’lumotni tekshirib qayta urinib ko‘ring.'}, status=exc.status)
