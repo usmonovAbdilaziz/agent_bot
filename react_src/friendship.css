@@ -25,7 +25,7 @@ main:has(.meeting-flow.meeting-friendly) #status { color: #234d78; }
 .friendship-spark { position: absolute; right: 10px; top: 12px; font-size: 32px; color: #1261da; }
 .meeting-flow.meeting-friendly .friendship-eyebrow { color: #1261da; font-size: 9px; font-weight: 800; letter-spacing: .12em; }
 .meeting-flow.meeting-friendly.meeting-intro h1 { margin: 14px 0 18px; }
-.meeting-flow.meeting-friendly .description { max-width: 34ch; line-height: 1.7; }
+.meeting-flow.meeting-friendly .description { max-width: 34ch; line-height: 1.7; color: #486581; }
 .meeting-flow.meeting-friendly .meeting-action { border-radius: 14px; background: #1261da; color: #fff; box-shadow: 0 7px 16px #1261da20; }
 .friendship-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 20px; color: #486581; font-size: 10px; }
 .friendship-tags span { display: flex; align-items: center; gap: 4px; }
