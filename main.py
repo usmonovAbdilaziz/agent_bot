@@ -22,6 +22,8 @@ from designs import DESIGNS, valid_design
 from config import Config
 from wedding import FIELDS, validate_field, validated_details, render_wedding
 from invitation_store import InvitationDB, parse_details, valid_ceremony_details, EVENT_KINDS, ceremony_expiry
+from love_gift import DESIGN as GIFT_DESIGN, code_hash, music_url
+from meeting import name as meeting_name, slots as meeting_slots, time_label, PLANS
 
 MAX_MEDIA = 20 * 1024 * 1024
 CEREMONY_LABELS = {'wedding':'To‘y', 'nikah':'Nikoh', 'beshik':'Beshik to‘y', 'sunnat':'Sunnat to‘y', 'fotiha':'Fotiha', 'birthday':'Tug‘ilgan kun', 'other':'Boshqa'}
@@ -88,6 +90,11 @@ class App:
                     f'Taklif #{mid}: {esc(item["title"])}\n'
                     f'Oluvchi “Ha”ni bosdi.\n'
                     f'“Yo‘q”ni bosishga urinishlar: <b>{item["no_attempts"]} marta</b>.')
+            response = await self.db.one('SELECT * FROM q_meeting_responses WHERE invite_id=?',(mid,))
+            if response:
+                text += f'\n\n<b>Uchrashuv rejasi</b>\nVaqt: {esc(time_label(response["when_value"]))} (O‘zbekiston)'
+                text += f'\nReja: {esc(PLANS[response["plan"]])}'
+                if response['note']: text += f'\nIzoh: {esc(response["note"])}'
             try:
                 sent = await asyncio.wait_for(self.send(item['sender'], text), timeout=10)
             except (TelegramAPIError, OSError, TimeoutError) as exc:
@@ -342,7 +349,26 @@ class App:
                 [('Orqaga',f'q:leave:{mid}'),('Bekor qilish',f'q:ccancel:{mid}')]))
         if flow['stage'].startswith('c_'):
             return await self.ceremony_prompt(uid,item,flow['stage'])
-        if flow['stage']=='media':
+        if flow['stage'].startswith('meeting_'):
+            details=json.loads(item['details'])
+            labels={
+                'meeting_recipient': 'Taklif kim uchun?\nOluvchining ismini yozing.',
+                'meeting_sender': 'Taklif kimdan?\nYakuniy xatdagi imzo uchun ismingizni yozing.',
+                'meeting_slots': 'Qachon uchrashamiz?\n1–3 ta sana va vaqtni alohida qatorda yuboring.\nShakl: KK.OO.YYYY SS:DD\nMasalan: 25.12.2026 19:00\n\nVaqtlar O‘zbekiston vaqti bilan. Oluvchi o‘ziga qulay boshqa vaqtni ham tanlay oladi.'}
+            default_label = ('Vaqtni oluvchi tanlasin' if flow['stage']=='meeting_slots' else
+                             'Shu ismni qoldirish')
+            current = (details.get('meeting_recipient',item['title']) if flow['stage']=='meeting_recipient'
+                       else details.get('meeting_sender') or (await self.db.one('SELECT full_name FROM q_profiles WHERE uid=?',(uid,)))['full_name'])
+            suffix = '' if flow['stage']=='meeting_slots' else f'\n\n{esc(current)}'
+            return await self.send(uid,'<b>Uchrashuvni sozlash</b>\n'+labels[flow['stage']]+suffix,
+                reply_markup=kb(*([[(default_label,f'q:mskip:{mid}')]] if current or flow['stage']=='meeting_slots' else []),[('Orqaga','q:back'),('Bekor qilish','q:cancel')]))
+        if flow['stage']=='gift_code':
+            return await self.send(uid,'<b>Syurpriz kodi</b>\n4 ta raqam yuboring. Kodni oluvchiga alohida ayting yoki kodsiz davom eting.',
+                reply_markup=kb([('Kodsiz davom etish',f'q:gskip:{mid}')],[('Orqaga','q:back'),('Bekor qilish','q:cancel')]))
+        elif flow['stage']=='gift_music':
+            return await self.send(uid,'<b>Sizlarning musiqangiz</b>\nSpotify, YouTube, Apple Music yoki Telegram musiqa havolasini yuboring. Ixtiyoriy.',
+                reply_markup=kb([('Musiqasiz davom etish',f'q:gskip:{mid}')],[('Orqaga','q:back'),('Bekor qilish','q:cancel')]))
+        elif flow['stage']=='media':
             await self.send(uid,f'<b>({progress}) Rasm yoki video</b>\nIxtiyoriy: yuboring yoki o‘tkazing.',
                 reply_markup=kb([('O‘tkazib yuborish',f'q:skip:{mid}')],[('Orqaga','q:back'),('Bekor qilish','q:cancel')]))
         elif flow['stage']=='title':
@@ -377,6 +403,14 @@ class App:
                          [InlineKeyboardButton(text='Tasdiqlash',callback_data=f'q:confirm:{item["id"]}'),
                           InlineKeyboardButton(text='Tahrirlash',callback_data=f'q:edit:{item["id"]}')]])
             return await self.send(uid,'<b>To‘y taklifnomasini tekshiring.</b> Tasdiqlasangiz, umumiy havola yaratiladi.',reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+        if json.loads(item['details']).get('meeting_direct'):
+            details = json.loads(item['details'])
+            rows = []
+            if self.cfg.webapp_url: rows.append([self.web_button('Ko‘rinishini ochish',item['id'])])
+            rows.append([InlineKeyboardButton(text='Ma’lumotlarni tahrirlash',callback_data=f'q:meeting:{item["id"]}')])
+            rows.append([InlineKeyboardButton(text='Tasdiqlash',callback_data=f'q:confirm:{item["id"]}')])
+            times = '\n'.join(time_label(value) for value in details.get('meeting_slots', [])) or 'Vaqtni oluvchi tanlaydi'
+            return await self.send(uid, '<b>Uchrashuv taklifini tekshiring</b>\nKim uchun: ' + esc(details.get('meeting_recipient','')) + '\nKimdan: ' + esc(details.get('meeting_sender','')) + '\n' + esc(times), reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
         kind, file_id = item['media_kind'], item['file_id']
         if kind=='photo': await self.call(uid,self.bot.send_photo,photo=file_id)
         elif kind=='video': await self.call(uid,self.bot.send_video,video=file_id)
@@ -399,9 +433,17 @@ class App:
         rows = []
         if self.cfg.webapp_url: rows.append([self.web_button('Ko‘rinishini ochish',item['id'])])
         rows.append([InlineKeyboardButton(text='🎨 Dizaynni tanlash',callback_data=f'q:design:{item["id"]}')])
+        if item['design']=='meeting':
+            rows.append([InlineKeyboardButton(text='Uchrashuvni sozlash',callback_data=f'q:meeting:{item["id"]}')])
+        gift_note = ''
+        if item['design']==GIFT_DESIGN:
+            details=json.loads(item['details'])
+            rows.append([InlineKeyboardButton(text='Kod va musiqani sozlash',callback_data=f'q:gift:{item["id"]}')])
+            gift_note = '\n\nSovg‘alar: maktub, musiqa va lolalar.\nKod: ' + ('yoqilgan' if details.get('gift_code_hash') else 'yo‘q')
+            gift_note += '\nMusiqa: ' + ('qo‘shilgan' if details.get('gift_music_url') else 'yo‘q')
         rows.append([InlineKeyboardButton(text='Tasdiqlash',callback_data=f'q:confirm:{item["id"]}'),
                      InlineKeyboardButton(text='Tahrirlash',callback_data=f'q:edit:{item["id"]}')])
-        await self.send(uid,f'<b>{esc(item["title"])}</b>\n\n{esc(item["description"])}\n\nHa  /  Yo‘q\n\nDizayn: {DESIGNS.get(item["design"], DESIGNS["classic"])["label_uz"]}',
+        await self.send(uid,f'<b>{esc(item["title"])}</b>\n\n{esc(item["description"])}\n\nHa  /  Yo‘q\n\nDizayn: {DESIGNS.get(item["design"], DESIGNS["classic"])["label_uz"]}{gift_note}',
             reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
 
     async def ceremony_prompt(self,uid,item,stage):
@@ -471,6 +513,26 @@ class App:
         if page>0: nav.append(('⬅️',f'q:guests:{mid}:{page-1}'))
         if (page+1)*2 < stats['yes']+stats['no']: nav.append(('➡️',f'q:guests:{mid}:{page+1}'))
         return await self.send(uid,text,reply_markup=kb(nav) if nav else None)
+
+    async def meeting_value(self, uid, item, stage, text=None):
+        details=json.loads(item['details'])
+        if stage=='meeting_recipient':
+            details['meeting_recipient']=meeting_name(details.get('meeting_recipient', item['title']) if text is None else text)
+            next_stage='meeting_sender'
+        elif stage=='meeting_sender':
+            profile=await self.db.one('SELECT full_name FROM q_profiles WHERE uid=?',(uid,))
+            details['meeting_sender']=meeting_name(details.get('meeting_sender', profile['full_name']) if text is None else text)
+            next_stage='meeting_slots'
+        elif stage=='meeting_slots':
+            details['meeting_slots']=[] if text is None else meeting_slots(text)
+            details['meeting_configured']=True
+            next_stage='preview'
+        else: return
+        await self.db.run('UPDATE q_invites SET details=? WHERE id=?',(json.dumps(details,ensure_ascii=False),item['id']))
+        if details.get('meeting_direct') and details.get('meeting_recipient'):
+            await self.db.run('UPDATE q_invites SET title=?, description=? WHERE id=?', (details['meeting_recipient'], details.get('meeting_sender', '') + ' sizni uchrashuvga taklif qiladi.', item['id']))
+        await self.db.stage(uid,next_stage,item['id'])
+        return await self.prompt(uid)
 
     async def deliver_link(self, q, item):
         if not item['link_sent']:
@@ -544,6 +606,24 @@ class App:
         if flow['stage']=='phone': return await self.choose_phone(uid,text)
         item = await self.db.invite(flow['invite_id'])
         if not item or item['status']!='draft': return await self.home(uid)
+        if flow['stage'].startswith('meeting_'):
+            try: return await self.meeting_value(uid,item,flow['stage'],text)
+            except ValueError as exc: return await self.send(uid,esc(str(exc)))
+        if flow['stage'] in ('gift_code','gift_music'):
+            details=json.loads(item['details'])
+            try:
+                if flow['stage']=='gift_code':
+                    details['gift_code_hash']=await asyncio.to_thread(code_hash,text)
+                    next_stage='gift_music'
+                else:
+                    details['gift_music_url']=music_url(text)
+                    details['gift_configured']=True
+                    next_stage='preview'
+            except ValueError as exc:
+                return await self.send(uid,esc(exc))
+            await self.db.run('UPDATE q_invites SET details=? WHERE id=?',(json.dumps(details,ensure_ascii=False),item['id']))
+            await self.db.stage(uid,next_stage,item['id'])
+            return await self.prompt(uid)
         if flow['stage'].startswith(('wedding_', 'wededit_')):
             field=flow['stage'].split('_',1)[1]
             try:
@@ -623,7 +703,7 @@ class App:
             flow=await self.db.flow(uid)
             if flow: return await self.prompt(uid)
             if action=='choose':
-                rows=[[('🎉 Ko‘ngilochar','q:fun')],[('💐 To‘y va marosimlar','q:ceremony')]]
+                rows=[[('💐 To‘y va marosimlar','q:ceremony')],[('🎉 Ko‘ngilochar','q:fun')]]
                 if getattr(self.cfg,'enable_ceremony',False): rows.append([('📋 Marosim va javoblar','q:check')])
                 rows.append([('Orqaga','q:home')])
                 return await self.send(uid,'<b>Taklif turini tanlang:</b>',reply_markup=kb(*rows))
@@ -631,10 +711,11 @@ class App:
                 return await self.send(uid,'<b>Marosim turini tanlang:</b>',reply_markup=kb([('💍 To‘y','q:wedding')],[('🎂 Banket','q:banquet')],[('Orqaga','q:choose')]))
             if action=='banquet':
                 return await self.send(uid,'Banket, jumladan tug‘ilgan kun taklifnomalari, keyingi bosqichda qo‘shiladi.',reply_markup=kb([('Orqaga','q:ceremony')]))
-            await self.db.begin(uid,'wedding' if action=='wedding' else 'fun')
-            if action=='fun':
-                flow=await self.db.flow(uid)
-                await self.db.stage(uid,'media',flow['invite_id'])
+            mid = await self.db.begin(uid,'wedding' if action=='wedding' else 'fun')
+            if action=='fun' and mid:
+                await self.db.run("UPDATE q_invites SET design='meeting', title='', description='Uchrashuvga taklif', details=? WHERE id=?",
+                                  (json.dumps({'meeting_direct': True}), mid))
+                await self.db.stage(uid,'meeting_recipient',mid)
             return await self.prompt(uid)
         if action=='invites' and len(parts)==3 and parts[2].isdigit(): return await self.invite_list(uid,int(parts[2]))
         if action=='invites': return await self.invite_list(uid)
@@ -653,9 +734,15 @@ class App:
             return await self.show_link(uid,item)
         if action=='back':
             flow=await self.db.flow(uid)
-            previous={'title':'media','description':'title','preview':'description'}
+            previous={'title':'media','description':'title','preview':'description','gift_code':'preview','gift_music':'gift_code',
+                      'meeting_recipient':'preview','meeting_sender':'meeting_recipient','meeting_slots':'meeting_sender'}
             if flow and flow['invite_id']:
                 current=await self.db.invite(flow['invite_id'])
+                if current and json.loads(current['details']).get('meeting_direct'):
+                    if flow['stage']=='meeting_recipient': return await self.home(uid)
+                    if flow['stage']=='preview':
+                        await self.db.stage(uid,'meeting_slots',current['id'])
+                        return await self.prompt(uid)
                 if current and current['type']=='wedding':
                     stages=['wedding_'+field for field in FIELDS]+['preview']
                     index=stages.index(flow['stage']) if flow['stage'] in stages else 0
@@ -794,7 +881,14 @@ class App:
             item=await self.db.invite(mid)
             flow=await self.db.flow(uid)
             if not item or item['sender']!=uid or item['status']!='draft' or not flow or flow['invite_id']!=mid or flow['stage']!='preview' or not valid_design(parts[3], item['type']): return
+            if json.loads(item['details']).get('meeting_direct'): return await self.prompt(uid)
             await self.db.run('UPDATE q_invites SET design=? WHERE id=?',(parts[3],mid))
+            if parts[3]==GIFT_DESIGN and not json.loads(item['details']).get('gift_configured'):
+                await self.db.stage(uid,'gift_code',mid)
+                return await self.prompt(uid)
+            if parts[3]=='meeting' and not json.loads(item['details']).get('meeting_configured'):
+                await self.db.stage(uid,'meeting_recipient',mid)
+                return await self.prompt(uid)
             return await self.preview(uid,await self.db.invite(mid))
         if action=='wedit' and len(parts)==4 and parts[2].isdigit() and parts[3] in FIELDS:
             mid=int(parts[2])
@@ -811,6 +905,24 @@ class App:
             return await self.deliver_link(q,item)
         flow=await self.db.flow(uid)
         if not flow or flow['invite_id']!=mid or item['status']!='draft': return
+        if action=='meeting' and flow['stage']=='preview' and item['design']=='meeting':
+            await self.db.stage(uid,'meeting_recipient',mid)
+            return await self.prompt(uid)
+        if action=='mskip' and flow['stage'].startswith('meeting_') and item['design']=='meeting':
+            try: return await self.meeting_value(uid,item,flow['stage'])
+            except ValueError as exc: return await self.send(uid,esc(str(exc)))
+        if action=='gift' and flow['stage']=='preview' and item['design']==GIFT_DESIGN:
+            await self.db.stage(uid,'gift_code',mid)
+            return await self.prompt(uid)
+        if action=='gskip' and flow['stage'] in ('gift_code','gift_music') and item['design']==GIFT_DESIGN:
+            details=json.loads(item['details'])
+            code=flow['stage']=='gift_code'
+            details['gift_code_hash' if code else 'gift_music_url']=''
+            if not code: details['gift_configured']=True
+            await self.db.run('UPDATE q_invites SET details=? WHERE id=?',(json.dumps(details,ensure_ascii=False),mid))
+            await self.db.stage(uid,'gift_music' if code else 'preview',mid)
+            return await self.prompt(uid)
+        if action in ('design','style') and json.loads(item['details']).get('meeting_direct'): return await self.prompt(uid)
         if action=='design' and flow['stage']=='preview':
             choices = [(f"{d['emoji']} {d['label_uz']}", f"q:style:{mid}:{d['id']}")
                        for d in DESIGNS.values() if d['type']==item['type']]
@@ -822,11 +934,20 @@ class App:
         elif action=='name' and flow['stage']=='title':
             await self.db.stage(uid,'description',mid)
         elif action=='edit' and flow['stage']=='preview':
+            if json.loads(item['details']).get('meeting_direct'):
+                await self.db.stage(uid,'meeting_recipient',mid)
+                return await self.prompt(uid)
             if item['type']=='wedding':
                 labels=['Kuyov','Kelin','Sana','Vaqt','Manzil']
                 return await self.send(uid,'Qaysi ma’lumotni tahrirlaymiz?',reply_markup=kb(*[[(label,f'q:wedit:{mid}:{field}')] for label,field in zip(labels,FIELDS)]))
             await self.db.stage(uid,'media',mid)
         elif action=='confirm' and flow['stage'] in ('preview','c_preview'):
+            if item['design']==GIFT_DESIGN and not json.loads(item['details']).get('gift_configured'):
+                await self.db.stage(uid,'gift_code',mid)
+                return await self.prompt(uid)
+            if item['design']=='meeting' and not json.loads(item['details']).get('meeting_configured'):
+                await self.db.stage(uid,'meeting_recipient',mid)
+                return await self.prompt(uid)
             if not self.cfg.webapp_url:
                 return await self.send(uid,'HTTPS sahifa ishlamayapti. Botni run.py orqali ishga tushiring, keyin tasdiqlang.')
             item=await self.db.publish(mid,uid,self.cfg.ttl)

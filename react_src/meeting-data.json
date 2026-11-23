@@ -1,0 +1,7 @@
+[
+  {"id":"coffee","label":"Qahva va uzoq suhbat","icon":"coffee"},
+  {"id":"cinema","label":"Kino va sayr","icon":"film"},
+  {"id":"dinner","label":"Ikki kishilik kechki ovqat","icon":"dinner"},
+  {"id":"surprise","label":"Mendan syurpriz","icon":"spark"},
+  {"id":"games","label":"Bouling yoki ko‘ngilochar o‘yin","icon":"game"}
+]

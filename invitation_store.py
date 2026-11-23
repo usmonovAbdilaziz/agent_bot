@@ -10,8 +10,14 @@ from urllib.parse import urlsplit
 from db import DB
 from designs import valid_design
 from wedding import validated_details, expires_at
+from love_gift import DESIGN as GIFT_DESIGN
+from meeting import requires_plan, validate_response
+import json
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS q_meeting_responses(
+ invite_id INTEGER PRIMARY KEY, when_value TEXT NOT NULL,
+ plan TEXT NOT NULL, note TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS q_profiles(uid INTEGER PRIMARY KEY, full_name TEXT NOT NULL, phone_hash TEXT UNIQUE);
 CREATE TABLE IF NOT EXISTS q_senders(uid INTEGER PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS q_sender_credits(uid INTEGER PRIMARY KEY, remaining INTEGER NOT NULL CHECK(remaining >= 0));
@@ -39,6 +45,9 @@ CREATE TABLE IF NOT EXISTS q_rsvps(
  invite_id INTEGER PRIMARY KEY REFERENCES q_invites(id), attending INTEGER NOT NULL CHECK(attending IN (0,1)),
  guests INTEGER NOT NULL CHECK(guests BETWEEN 0 AND 10), responded_at REAL NOT NULL,
  receiver_name TEXT NOT NULL, notice_status TEXT NOT NULL DEFAULT 'pending');
+CREATE TABLE IF NOT EXISTS q_gift_access(invite_id INTEGER NOT NULL, uid INTEGER NOT NULL,
+ unlocked INTEGER NOT NULL DEFAULT 0, failures INTEGER NOT NULL DEFAULT 0,
+ blocked_until REAL NOT NULL DEFAULT 0, PRIMARY KEY(invite_id,uid));
 CREATE TABLE IF NOT EXISTS q_sender_requests(
  id INTEGER PRIMARY KEY AUTOINCREMENT, uid INTEGER NOT NULL,
  status TEXT NOT NULL DEFAULT 'pending', created_at REAL NOT NULL,
@@ -299,6 +308,10 @@ class InvitationDB(DB):
     async def publish(self, mid, uid, ttl):
         async with self.connect(True) as c:
             row = await (await c.execute('SELECT * FROM q_invites WHERE id=? AND sender=?',(mid,uid))).fetchone()
+            if row and row['design']==GIFT_DESIGN and not json.loads(row['details']).get('gift_configured'):
+                return None
+            if row and row['design']=='meeting' and not json.loads(row['details']).get('meeting_configured'):
+                return None
             if not row or not row['title'].strip() or len(row['title'])>120 or not valid_design(row['design'], row['type']) or parse_details(row['details']) is None:
                 return None
             wedding = validated_details(row['details']) if row['type']=='wedding' else None
@@ -352,13 +365,19 @@ class InvitationDB(DB):
             if approve: await self._grant(c,row['uid'],1)
             return row['uid']
 
-    async def accept(self, mid, uid, no_attempts=0):
+    async def accept(self, mid, uid, no_attempts=0, meeting_response=None):
         async with self.connect(True) as c:
             row = await (await c.execute('SELECT * FROM q_invites WHERE id=? AND receiver=?',(mid,uid))).fetchone()
             if not row or row['type']!='fun': return False
             if row['status']=='accepted': return True
             if row['status']!='ready' or row['expires_at']<=time.time(): return False
+            if requires_plan(row) or meeting_response is not None:
+                try: meeting_response = validate_response(meeting_response)
+                except ValueError: return False
             await c.execute("UPDATE q_invites SET status='accepted',accepted_at=?,no_attempts=? WHERE id=?",(time.time(),no_attempts,mid))
+            if meeting_response is not None:
+                await c.execute('INSERT INTO q_meeting_responses VALUES(?,?,?,?)',
+                    (mid,meeting_response['when'],meeting_response['plan'],meeting_response['note']))
             await c.execute('INSERT OR IGNORE INTO q_done VALUES(?,?)',(uid,time.time()))
             await c.execute('INSERT OR IGNORE INTO q_accept_notices(invite_id) VALUES(?)',(mid,))
             return True

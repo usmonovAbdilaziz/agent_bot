@@ -15,3 +15,9 @@
 !wedding_assets/**
 !react_src/
 !react_src/designs.json
+!react_src/meeting-data.json
+!meeting.py
+!love_gift.py
+!wedding.py
+!wedding_assets/
+!wedding_assets/**

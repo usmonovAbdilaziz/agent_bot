@@ -2,12 +2,16 @@
 import io
 import time
 import asyncio
+import hmac
 from collections import OrderedDict
+from urllib.parse import urlencode
 from aiohttp import web
 from designs import DESIGNS, valid_design
 from invitation_store import parse_details, valid_ceremony_details, ceremony_passed
 from web_common import BOT_APP, STATIC, ApiProblem, protect, page, healthz
 from wedding import render_wedding, validated_details
+from love_gift import DESIGN as GIFT_DESIGN, check_code
+from meeting import public_config, requires_plan, validate_response, calendar_file, calendar_signature
 
 MAX_MEDIA=20*1024*1024
 PHOTO_CACHE_BYTES=16*1024*1024
@@ -66,7 +70,7 @@ async def invite_for(request):
         raise ApiProblem('Taklif muddati tugagan.',409)
     return item
 
-async def detail(request):
+async def legacy_detail(request):
     item=await invite_for(request)
     details = parse_details(item['details'])
     if details is None or (item['type']=='ceremony' and not valid_ceremony_details(details,complete=True)):
@@ -80,6 +84,105 @@ async def detail(request):
         'type':item['type'], 'share_mode':item['share_mode'], 'details':details,
         'preview':request['uid']==item['sender'], 'rsvp':dict(response) if response else None,
         'rsvp_closed':item['type']=='ceremony' and ceremony_passed(details)})
+
+async def gift_locked(request, item):
+    if item['design']!=GIFT_DESIGN or request['uid']==item['sender']:
+        return False
+    if not json.loads(item['details']).get('gift_code_hash'):
+        return False
+    return not bool(await request.app[BOT_APP].db.one(
+        'SELECT 1 FROM q_gift_access WHERE invite_id=? AND uid=? AND unlocked=1',
+        (item['id'],request['uid'])))
+
+async def public_detail(request, item):
+    design = item['design'] if valid_design(item['design'], item['type']) else ('wedding_classic' if item['type']=='ceremony' else 'classic')
+    details=json.loads(item['details']) if item['type']=='ceremony' else {}
+    locked=await gift_locked(request,item)
+    if design==GIFT_DESIGN:
+        details={'gift_locked':locked, 'gift_music_url':'' if locked else json.loads(item['details']).get('gift_music_url','')}
+    elif design=='meeting':
+        details=public_config(item)
+        response=await request.app[BOT_APP].db.one(
+            'SELECT when_value,plan,note FROM q_meeting_responses WHERE invite_id=?',(item['id'],))
+        details['meeting_response']=({'when':response['when_value'],'plan':response['plan'],'note':response['note']}
+                                     if response else None)
+    return {k:item[k] for k in ('id','title','description','media_kind','status')} | {
+        'description':'' if locked else item['description'],
+        'design':design,
+        'type':item['type'], 'details':details,
+        'preview':request['uid']==item['sender']}
+
+async def detail(request):
+    item = await invite_for(request)
+    if item['design'] not in ('meeting', GIFT_DESIGN): return await legacy_detail(request)
+    return web.json_response(await public_detail(request,await invite_for(request)))
+
+
+async def meeting_calendar_data(app, item):
+    if item['design'] != 'meeting' or item['status'] != 'accepted':
+        raise ApiProblem('Avval uchrashuv rejasini tasdiqlang.', 409)
+    response = await app.db.one('SELECT * FROM q_meeting_responses WHERE invite_id=?', (item['id'],))
+    if not response:
+        raise ApiProblem('Bu taklifda uchrashuv rejasi saqlanmagan.', 409)
+    return response
+
+
+async def meeting_calendar_link(request):
+    app = request.app[BOT_APP]
+    item = await invite_for(request)
+    await meeting_calendar_data(app, item)
+    expires = int(time.time()) + 300
+    params = {'uid': request['uid'], 'expires': expires,
+              'signature': calendar_signature(app.cfg.token, item['id'], request['uid'], expires)}
+    path = f'/files/meeting/{item["id"]}.ics?' + urlencode(params)
+    return web.json_response({'url': app.cfg.webapp_url.rstrip('/') + path,
+                              'file_name': f'uchrashuv-{item["id"]}.ics'})
+
+
+async def meeting_calendar_download(request):
+    app = request.app[BOT_APP]
+    try:
+        mid, uid, expires = int(request.match_info['mid']), int(request.query['uid']), int(request.query['expires'])
+        signature = request.query['signature']
+    except (KeyError, ValueError):
+        raise ApiProblem('Kalendar havolasi yaroqsiz. Rejani qayta saqlang.', 403) from None
+    expected = calendar_signature(app.cfg.token, mid, uid, expires)
+    if (not int(time.time()) < expires <= int(time.time()) + 300 or len(signature) != 64
+            or not signature.isascii() or not hmac.compare_digest(expected, signature)):
+        raise ApiProblem('Kalendar havolasi eskirgan. Rejani qayta saqlang.', 403)
+    item = await app.db.invite(mid)
+    user = await app.db.one('SELECT active,is_blocked FROM users WHERE tg_id=?', (uid,))
+    if not item or uid not in (item['sender'], item['receiver']) or not user or not user['active'] or user['is_blocked']:
+        raise ApiProblem('Kalendar fayli topilmadi.', 404)
+    response = await meeting_calendar_data(app, item)
+    return web.Response(body=calendar_file(item, response, app.username), content_type='text/calendar', charset='utf-8',
+                        headers={'Content-Disposition': f'attachment; filename="uchrashuv-{mid}.ics"',
+                                 'Access-Control-Allow-Origin': 'https://web.telegram.org'})
+
+async def unlock_gift(request):
+    app=request.app[BOT_APP]
+    try:
+        payload=await request.json()
+    except ValueError:
+        raise ApiProblem('4 xonali kodni kiriting.',400)
+    if not isinstance(payload,dict) or not isinstance(payload.get('code'),str) or len(payload['code'])!=4 or not payload['code'].isascii() or not payload['code'].isdigit():
+        raise ApiProblem('4 xonali kodni kiriting.',400)
+    async with app.lock:
+        item=await invite_for(request)
+        if item['design']!=GIFT_DESIGN: raise ApiProblem('Syurpriz topilmadi.',404)
+        if await gift_locked(request,item):
+            row=await app.db.one('SELECT * FROM q_gift_access WHERE invite_id=? AND uid=?',(item['id'],request['uid']))
+            now=time.time()
+            if row and row['blocked_until']>now:
+                raise ApiProblem('Ko‘p urinish bo‘ldi. 1 daqiqadan keyin qayta urinib ko‘ring.',429)
+            correct=await asyncio.to_thread(check_code,payload['code'],json.loads(item['details'])['gift_code_hash'])
+            failures=0 if correct else (row['failures'] if row and not row['blocked_until'] else 0)+1
+            blocked=now+60 if failures>=5 else 0
+            await app.db.run('INSERT INTO q_gift_access VALUES(?,?,?,?,?) ON CONFLICT(invite_id,uid) DO UPDATE SET unlocked=excluded.unlocked,failures=excluded.failures,blocked_until=excluded.blocked_until',
+                             (item['id'],request['uid'],int(correct),failures,blocked))
+            if not correct:
+                raise ApiProblem('Ko‘p urinish bo‘ldi. 1 daqiqadan keyin qayta urinib ko‘ring.' if blocked else 'Kod mos kelmadi. Yana urinib ko‘ring.',429 if blocked else 400)
+    return web.json_response(await public_detail(request,item))
 
 class BoundedBuffer(io.BytesIO):
     def write(self, data):
@@ -171,8 +274,13 @@ async def accept(request):
         item=await invite_for(request)
         if item['type'] in ('ceremony','wedding'): raise ApiProblem('Bu taklif javob talab qilmaydi.',409)
         if request['uid']!=item['receiver']: raise ApiProblem('Faqat oluvchi tasdiqlaydi.',403)
+        if await gift_locked(request,item): raise ApiProblem('Avval syurpriz kodini kiriting.',403)
+        meeting_response=None
+        if item['status']!='accepted' and (requires_plan(item) or (item['design']=='meeting' and isinstance(payload,dict) and 'meeting_response' in payload)):
+            try: meeting_response=validate_response(payload.get('meeting_response'))
+            except ValueError as exc: raise ApiProblem(str(exc),400) from None
         async with request.app[PHOTO_LOCK]:
-            if not await app.db.accept(item['id'],request['uid'],count):
+            if not await app.db.accept(item['id'],request['uid'],count,meeting_response):
                 raise ApiProblem('Taklifni qabul qilib bo‘lmadi.',409)
             if item['media_kind']=='photo': request.app[PHOTO_CACHE].remove(item['file_id'])
     await app.notify_acceptance(item['id'])
@@ -234,8 +342,11 @@ def create_web_app(app):
     server.router.add_get('/api/invites/{mid}',detail)
     server.router.add_get('/api/invites/{mid}/media',media)
     server.router.add_get('/api/invites/{mid}/wedding-image',wedding_image)
+    server.router.add_post('/api/invites/{mid}/calendar',meeting_calendar_link)
+    server.router.add_get('/files/meeting/{mid}.ics',meeting_calendar_download)
     server.router.add_post('/api/invites/{mid}/accept',accept)
     server.router.add_post('/api/invites/{mid}/rsvp',rsvp)
+    server.router.add_post('/api/invites/{mid}/unlock',unlock_gift)
     server.router.add_static('/assets',STATIC,show_index=False)
     return server
 

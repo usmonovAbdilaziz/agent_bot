@@ -174,3 +174,22 @@ main:has(.invitation) { max-width: none; padding: 0; }
 .envelope-seal { z-index:1; display:grid; place-items:center; width:50px; height:50px; border-radius:50%; color:#fff; background:#8c3434; font-size:26px; }
 @keyframes envelope-open { 0%,35% { transform:scale(.88); opacity:0; } 55% { opacity:1; transform:scale(1); } 100% { opacity:1; transform:scale(1.05); } }
 @media (prefers-reduced-motion:reduce) { .envelope-shape, .envelope-flap { animation:none; } }
+/* Uchrashuv: sokin qog‘oz va bordo aksentli taklifnoma. */
+.design-meeting {
+  --text: #493a35; --muted: #75675e; --accent: #9d3048;
+  --on-accent: #fff; --soft: #ede5dc; --glow: #7e26382b;
+  position: relative; padding: 26px 25px 12px; min-height: 440px;
+  color: var(--text); background: #f7f3e9; border: 1px solid #e7dccd;
+  border-radius: 5px; box-shadow: 0 14px 38px #54463b22;
+}
+.design-meeting::before { content: ''; position: absolute; inset: 8px; border: 1px solid #e8dfd2; pointer-events: none; }
+.meeting-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #967f70; font-size: 9px; font-weight: 700; letter-spacing: .16em; }
+.meeting-heading span:nth-child(2) { font-size: 13px; color: #ab7e71; }
+.meeting-seal { display: grid; place-items: center; width: 58px; height: 58px; margin: 45px auto 0; border: 1px solid #dccbc0; border-radius: 50%; color: #a43a50; font-size: 22px; background: #fffaf4; }
+.design-meeting .media-wrap { margin-top: 24px; }
+.design-meeting h1 { font-family: Georgia, serif; font-weight: 500; color: #6e2c3a; font-size: clamp(26px, 7vw, 34px); margin-top: 24px; }
+.design-meeting .description { max-width: 32ch; margin: 0 auto; color: #6e6058; }
+.design-meeting .arena { margin-top: 28px; }
+.design-meeting .arena button { border-radius: 999px; }
+.design-meeting .no { background: #eee5dd; }
+.design-meeting .preview-note { position: relative; }

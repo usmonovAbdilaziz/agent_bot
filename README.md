@@ -228,3 +228,7 @@ Ruxsatli sender `/check` buyrug‘i bilan taklif yaratishni boshlaydi; admin men
 Yangi dizayn: `react_src/designs.json`ga yagona ID, tur, nom va behavior yozing; `react_src/style.css`da kontrastli CSS qo‘shing; fun effekt kerak bo‘lsa `react_src/main.jsx`dagi lokal effektga ulang (ceremony hazil effektlarisiz); registry, Playwright, kontrast va reduced-motion testlarini yangilang, `npm run build` bilan `web_minimal`ni qayta yarating. Deploy va bazani qaytarish: [ROLLBACK.md](ROLLBACK.md).
 
 Ceremony havolasi Toshkent vaqti bilan marosim kuni tugaganidan keyin yana 24 soatgacha, nashrdan ko‘pi bilan 400 kungacha amal qiladi. Avvalgi havolalarning saqlangan muddati o‘zgarmaydi; avval javob bergan mehmon o‘z javobini keyin ham ko‘radi. Fun havolasining sozlangan TTL muddati o‘zgarmaydi. Media cache xotirada 16 MiB jami, 2 MiB har bir fayl va 15 daqiqa bilan cheklangan; katta videolar cache qilinmaydi. `MEDIA_DOWNLOAD_CONCURRENCY` (standart 4), `MEDIA_RATE_LIMIT_PER_MINUTE` (standart 120) sozlanadi; Range so‘rovi 206 qaytaradi.
+
+### Uchrashuv yaratish
+
+Taklif yaratish → Ko‘ngilochar → Kim uchun → Kimdan → Sana-vaqt → Oldindan ko‘rish → Tasdiqlash. Dizayn avtomatik tanlanadi. Oluvchi uchrashuv rejasini tasdiqlashi va kalendarga qo‘shishi mumkin.

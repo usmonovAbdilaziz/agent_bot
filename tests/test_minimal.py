@@ -74,7 +74,7 @@ async def test_fun_registry_options_are_available_in_two_column_rows(n):
     mid=await draft(n)
     await n.cb(1,f'q:design:{mid}')
     rows=json.loads(n.sent(1)[-1]['reply_markup'])['inline_keyboard']
-    assert [len(row) for row in rows]==[2,2,2,1]
+    assert all(len(row)==2 for row in rows[:-1]) and 1 <= len(rows[-1]) <= 2
     assert {button['callback_data'].split(':')[-1] for row in rows for button in row}=={key for key, value in DESIGNS.items() if value['type']=='fun'}
     for design in ('birthday','neon','newyear'):
         await n.cb(1,f'q:style:{mid}:{design}')

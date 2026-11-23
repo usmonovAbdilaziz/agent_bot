@@ -5,17 +5,18 @@ import hashlib
 import argparse
 
 ROOT=Path(__file__).resolve().parent
-FILES=['designs.py','wedding.py','config.py','invitation_store.py','web_common.py','legacy_bot.py','legacy_webapp.py','API_CONTRACT.md','PRODUCT.md','DESIGN.md','main.py','db.py','run.py','launch.py','webapp.py','package.py','requirements.txt','requirements-dev.txt','package.json','package-lock.json','vite.config.js',
+FILES=['designs.py','wedding.py','meeting.py','love_gift.py','config.py','invitation_store.py','web_common.py','legacy_bot.py','legacy_webapp.py','API_CONTRACT.md','PRODUCT.md','DESIGN.md','main.py','db.py','run.py','launch.py','webapp.py','package.py','requirements.txt','requirements-dev.txt','package.json','package-lock.json','vite.config.js',
        '.env.example','.gitignore','README.md','TEST_REPORT.md','ROLLBACK.md','CHANGELOG.md','DEVICE_CHECKLIST.md','scripts/sqlite_safe_backup.py','pytest.ini','start.command','start.bat',
        'start_windows.ps1','setup_config.py','WINDOWS_README.txt']
 
 
-def build(windows=False):
+def build(windows=False, target=None):
     files=[ROOT/name for name in FILES]
     files += [p for p in (ROOT/'wedding_assets').rglob('*') if p.is_file()]
     files += [p for folder in ('tests','postman','web','web_minimal','react_src') for p in (ROOT/folder).rglob('*')
-              if p.is_file() and '__pycache__' not in p.parts and p.suffix in ('.py','.js','.jsx','.yaml','.json','.html','.css','.cjs','.md','.sql')]
-    target=ROOT.parent/('agent_bot_windows.zip' if windows else 'agent_bot_minimal.zip')
+              if p.is_file() and '__pycache__' not in p.parts and p.suffix in ('.py','.js','.jsx','.yaml','.json','.html','.css','.cjs','.md','.webp','.png','.ttf','.sql')]
+    target=Path(target) if target is not None else ROOT.parent/('agent_bot_windows.zip' if windows else 'agent_bot_minimal.zip')
+    target.parent.mkdir(parents=True,exist_ok=True)
     with ZipFile(target,'w',ZIP_DEFLATED) as z:
         for path in sorted(files):
             name=Path('agent_bot')/path.relative_to(ROOT)
@@ -27,9 +28,12 @@ def build(windows=False):
         assert z.testzip() is None
         assert all(Path(name).name!='.env' and '.venv' not in Path(name).parts for name in z.namelist())
     print(f'ZIP: {target}\nFayllar: {len(files)}\nSHA256: {hashlib.sha256(target.read_bytes()).hexdigest()}')
+    return target
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--windows',action='store_true')
-    build(parser.parse_args().windows)
+    parser.add_argument('--output',type=Path,help='ZIP faylining manzili')
+    args=parser.parse_args()
+    build(args.windows,args.output)

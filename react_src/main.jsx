@@ -1,3 +1,5 @@
+import Meeting from './Meeting.jsx';
+import './meeting.css';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';
@@ -433,7 +435,7 @@ function App() {
       const data = await api(`/invites/${id}`);
       setInvite(data);
       showStatus('');
-      setScreen(data.status === 'accepted' && !data.preview ? 'accepted' : 'ready');
+      setScreen(data.status === 'accepted' && !data.preview && data.design !== 'meeting' ? 'accepted' : 'ready');
     } catch (error) {
       setScreen('error');
       showStatus(messageFor(error), true);
@@ -460,6 +462,8 @@ function App() {
       {screen === 'error' && <button type="button" className="retry" onClick={load}>Qayta urinish</button>}
       {screen === 'ready' && invite && (invite.type === 'wedding'
         ? <WeddingInvitation invite={invite} onStatus={showStatus} />
+        : invite.design === 'meeting'
+        ? <Meeting key={invite.id} invite={invite} api={api} onStatus={showStatus} renderMedia={data => <BackgroundMedia invite={data} onError={message => showStatus(message, true)} />} />
         : invite.type === 'ceremony'
         ? <CeremonyInvitation invite={invite} onStatus={showStatus} />
         : <FunInvitation invite={invite} onStatus={showStatus} accepted={() => setScreen('accepted')} />)}

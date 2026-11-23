@@ -1,0 +1,192 @@
+// Reference sequence using the shipping frontend and a controlled HTTP contract.
+const {chromium}=require('playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs/promises');
+const path=require('node:path');
+const http=require('node:http');
+const root=path.resolve(__dirname,'..');
+const out=path.join(root,'output/meeting');
+
+(async()=>{
+ await fs.mkdir(out,{recursive:true});
+ const files=http.createServer((req,res)=>{
+  res.writeHead(200,{'Content-Type':'text/calendar; charset=utf-8','Content-Disposition':'attachment; filename="uchrashuv-1.ics"'});
+  res.end('BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n');
+ });
+ await new Promise(resolve=>files.listen(0,'127.0.0.1',resolve));
+ const calendarUrl=`http://127.0.0.1:${files.address().port}/uchrashuv-1.ics`;
+ const browser=await chromium.launch({headless:true});
+ try {
+  for(const [name,width,height] of [['mobile',390,844],['desktop',1280,800],['small',280,700]]) {
+   const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce',hasTouch:name!=='desktop'});
+   const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+   await page.addInitScript(({native})=>{let seed=42;Math.random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);window.Telegram={WebApp:{initData:'TEST_FIXTURE',initDataUnsafe:{user:{id:2}},ready(){},expand(){},platform:native?'android':'weba',isVersionAtLeast(){return native;},downloadFile(file,callback){window.calendarDownload=file;callback(!window.cancelCalendarDownload);},HapticFeedback:{impactOccurred(){},notificationOccurred(){}}}};},{native:name==='mobile'});
+   let saved=null,fail=true,calendarFail=true,calendarRequests=0,preview=false,posts=[],recipient='Shaxzoda',sender='Javohir';
+   const day=new Date(Date.now()+2*86400000).toISOString().slice(0,10);
+   const when=day+'T19:00+05:00';
+   await context.route('https://telegram.org/**',r=>r.fulfill({contentType:'application/javascript',body:''}));
+   await context.route('http://meeting.test/**',async route=>{
+    const url=new URL(route.request().url());
+    if(url.pathname.endsWith('/calendar')) {
+     calendarRequests++;
+     if(calendarFail){calendarFail=false;if(name==='desktop')return route.abort('failed');return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Kalendar tayyorlanmadi. Qayta urinib ko‘ring.'})});}
+     return route.fulfill({contentType:'application/json',body:JSON.stringify({url:calendarUrl,file_name:'uchrashuv-1.ics'})});
+    }
+    if(url.pathname.endsWith('/accept')) {
+     const body=route.request().postDataJSON();posts.push(body);
+     if(fail){fail=false;return route.fulfill({status:502,contentType:'application/json',body:JSON.stringify({error:'Sinov: aloqa uzildi. Qayta urinib ko‘ring.'})});}
+     saved=saved||body.meeting_response;
+     return route.fulfill({contentType:'application/json',body:JSON.stringify({accepted:true})});
+    }
+    if(url.pathname.startsWith('/api/')) return route.fulfill({contentType:'application/json',body:JSON.stringify({
+     id:1,title:'Uchrashuv',description:'Bir piyola choy ustida suhbatlashamiz.',media_kind:'none',type:'fun',design:'meeting',preview,
+     status:saved?'accepted':'ready',details:{meeting_recipient:recipient,meeting_sender:sender,meeting_slots:name==='small'?[]:[when],meeting_configured:true,meeting_response:saved}
+    })});
+    const file=url.pathname==='/'?'index.html':path.basename(url.pathname);
+    return route.fulfill({contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':file.endsWith('.ttf')?'font/ttf':'text/html',body:await fs.readFile(path.join(root,'web_minimal',file))});
+   });
+   const shot=async phase=>{if(name==='mobile'||phase==='letter'||phase==='when'||phase==='question-active')await page.screenshot({path:path.join(out,`${name}-${phase}.png`),fullPage:true,animations:'disabled'});};
+   const noOverflow=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+   await page.goto('http://meeting.test/?invite=1');
+   await page.getByRole('slider').waitFor();await noOverflow();await shot('intro');
+   await page.getByRole('slider').press('End');
+   await page.getByRole('heading',{name:'Shaxzoda, uchrashamizmi?'}).waitFor();await noOverflow();await shot('question');
+   const no=page.getByRole('button',{name:'Yo‘q — qochadigan hazil tugmasi'});
+   const initialYes=await page.getByRole('button',{name:'Ha',exact:true}).boundingBox();
+   assert.ok(initialYes.height>=72);
+   const positions=[];
+   for(let i=0;i<10;i++){
+    if(i===0&&name==='desktop') {
+     const box=await no.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
+    } else if(i===0) await no.tap();
+    else {await no.focus();await page.keyboard.press('Enter');}
+    const geometry=await page.evaluate(()=>{
+     const rect=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height};};
+     return{no:rect('.meeting-no'),yes:rect('.meeting-choices .yes'),label:rect('.meeting-yes-content'),arena:rect('.meeting-choices')};
+    });
+    const {no:chip,yes,label,arena}=geometry;
+    assert.equal(await no.innerText(),'Yo‘q');
+    assert.ok(chip.x>=arena.x&&chip.y>=arena.y&&chip.x+chip.w<=arena.x+arena.w+1&&chip.y+chip.h<=arena.y+arena.h+1);
+    assert.ok(!(chip.x<label.x+label.w&&chip.x+chip.w>label.x&&chip.y<label.y+label.h&&chip.y+chip.h>label.y),'No chip covers Ha label');
+    assert.ok(chip.x<yes.x+yes.w&&chip.x+chip.w>yes.x&&chip.y<yes.y+yes.h&&chip.y+chip.h>yes.y,'No chip must touch Ha border');
+    if(positions.length)assert.ok(Math.hypot(chip.x-positions.at(-1)[0],chip.y-positions.at(-1)[1])>35,'Each attempt must visibly move No');
+    positions.push([Math.round(chip.x),Math.round(chip.y)]);
+   }
+   assert.ok(new Set(positions.map(p=>p.join(','))).size>=3);
+   assert.ok(new Set(positions.map(p=>p[1])).size>1,'No must move vertically around Ha');
+   const grownYes=await page.getByRole('button',{name:'Ha',exact:true}).boundingBox();
+   assert.ok(grownYes.height>initialYes.height&&grownYes.width>=initialYes.width);
+   await page.getByRole('heading',{name:'Shaxzoda, uchrashamizmi?'}).focus();
+   await noOverflow();await shot('question-active');
+   if(name==='mobile') {
+    // Reduced motion pauses idle movement; normal idle relocation never counts a No.
+    const still=await no.boundingBox();await page.waitForTimeout(1900);
+    assert.deepEqual(await no.boundingBox(),still);
+    await page.emulateMedia({reducedMotion:'no-preference'});await page.reload();
+    await page.getByRole('heading',{name:'Shaxzoda, uchrashamizmi?'}).waitFor();
+    await page.waitForTimeout(100);
+    await page.screenshot({path:path.join(out,'mobile-orbit-0.png'),fullPage:true});
+    for(let frame=1;frame<=2;frame++) {
+     const before=await no.boundingBox();
+     await page.waitForFunction(({x,y})=>{const r=document.querySelector('.meeting-no').getBoundingClientRect();return Math.abs(r.x-x)+Math.abs(r.y-y)>2;},before,{timeout:5000});
+     assert.equal(await no.innerText(),'Yo‘q');
+     await page.screenshot({path:path.join(out,`mobile-orbit-${frame}.png`),fullPage:true});
+    }
+    await page.emulateMedia({reducedMotion:'reduce'});
+    assert.equal(posts.length,0);
+   }
+   assert.equal(posts.length,0);
+   await page.getByRole('button',{name:'Ha',exact:true}).click();
+   await page.getByRole('heading',{name:'Ajoyib, uchrashamiz!'}).waitFor();assert.equal(posts.length,0);await shot('celebrate');
+   await page.getByRole('button',{name:'Rejani tanlash'}).click();
+   await page.getByRole('heading',{name:'Kun va vaqtni tanlang'}).waitFor();
+   assert.equal(await page.getByRole('button',{name:'Keyingi — rejani tanlash'}).isDisabled(),true);
+   if(name!=='small') {
+    // Sender suggestions continue to work alongside the calendar.
+    await page.locator('input[name="meeting-time"]').first().check();
+    assert.equal(await page.getByRole('button',{name:'Keyingi — rejani tanlash'}).isDisabled(),false);
+    await page.getByRole('radio',{name:'O‘zimga qulay vaqtni tanlayman'}).check();
+   }
+   await page.getByRole('group',{name:'Uchrashuv kalendari',exact:true}).waitFor();
+   assert.equal(await page.getByRole('button',{name:'Oldingi oy',exact:true}).isDisabled(),true);
+   const uzToday=new Date(Date.now()+5*3600000).toISOString().slice(0,10);
+   const monthDelta=(Number(day.slice(0,4))-Number(uzToday.slice(0,4)))*12+Number(day.slice(5,7))-Number(uzToday.slice(5,7));
+   for(let i=0;i<monthDelta;i++)await page.getByRole('button',{name:'Keyingi oy',exact:true}).click();
+   const dateButton=page.locator(`[data-day="${day}"]`);
+   await dateButton.click();
+   assert.equal(await dateButton.getAttribute('aria-pressed'),'true');
+   await dateButton.press('ArrowRight');
+   await page.waitForFunction(value=>document.activeElement?.dataset.day!==value,day);
+   assert.notEqual(await page.locator(':focus').getAttribute('data-day'),day);
+   await dateButton.click();
+   await page.getByLabel('Soat',{exact:true}).selectOption('19');
+   await page.getByLabel('Daqiqa',{exact:true}).selectOption('00');
+   if(name==='desktop') {
+    // Bound navigation at 366 days, including year/month changes.
+    const maxDay=new Date(Date.now()+366*86400000+5*3600000).toISOString().slice(0,10);
+    const maxMonths=(Number(maxDay.slice(0,4))-Number(day.slice(0,4)))*12+Number(maxDay.slice(5,7))-Number(day.slice(5,7));
+    for(let i=0;i<maxMonths;i++)await page.getByRole('button',{name:'Keyingi oy',exact:true}).click();
+    assert.equal(await page.getByRole('button',{name:'Keyingi oy',exact:true}).isDisabled(),true);
+    const beyond=new Date(maxDay+'T12:00:00Z');beyond.setUTCDate(beyond.getUTCDate()+1);
+    if(beyond.toISOString().slice(0,7)===maxDay.slice(0,7))assert.equal(await page.locator(`[data-day="${beyond.toISOString().slice(0,10)}"]`).isDisabled(),true);
+    for(let i=0;i<maxMonths;i++)await page.getByRole('button',{name:'Oldingi oy',exact:true}).click();
+   }
+   await noOverflow();await shot('when');
+   await page.getByRole('button',{name:'Keyingi — rejani tanlash'}).click();
+   await page.getByRole('heading',{name:'Reja va tilakni tanlang'}).waitFor();
+   assert.equal(await page.getByRole('button',{name:'Uchrashuvni tasdiqlash'}).isDisabled(),true);
+   await page.getByRole('radio',{name:'Qahva va uzoq suhbat'}).check();
+   await page.getByLabel('Sizdan bir-ikki og‘iz — ixtiyoriy').fill('Sinov izohi — kelishdik.');
+   // Back/forward and reload retain the selections without sending anything.
+   await page.getByRole('button',{name:'Vaqtga qaytish'}).click();
+   await page.getByRole('button',{name:'Keyingi — rejani tanlash'}).click();await page.reload();
+   await page.getByRole('heading',{name:'Reja va tilakni tanlang'}).waitFor();
+   assert.equal(await page.getByLabel('Sizdan bir-ikki og‘iz — ixtiyoriy').inputValue(),'Sinov izohi — kelishdik.');
+   assert.equal(posts.length,0);await noOverflow();await shot('plan');
+   await page.getByRole('button',{name:'Uchrashuvni tasdiqlash'}).click();
+   await page.getByText('Sinov: aloqa uzildi. Qayta urinib ko‘ring.').waitFor();
+   assert.equal(await page.locator('.meeting-letter').count(),0);
+   await page.getByRole('button',{name:'Uchrashuvni tasdiqlash'}).click();
+   await page.getByRole('heading',{name:'Biz uchun kichkina xat'}).waitFor();
+   assert.equal(posts.length,2);assert.equal(posts[1].no_attempts,10);
+   assert.deepEqual(saved,{when,plan:'coffee',note:'Sinov izohi — kelishdik.'});
+   await noOverflow();await shot('letter');
+   await page.getByRole('button',{name:'Rejani saqlash',exact:true}).click();
+   await page.getByText(name==='desktop'?'Aloqa uzildi. Rejani saqlashga qayta urinib ko‘ring.':'Kalendar tayyorlanmadi. Qayta urinib ko‘ring.',{exact:true}).waitFor();
+   if(name==='mobile') {
+    await page.getByRole('button',{name:'Rejani saqlash',exact:true}).click();
+    await page.getByText('Kalendar faylini ochib, kalendarga qo‘shing.',{exact:true}).waitFor();
+    assert.deepEqual(await page.evaluate(()=>window.calendarDownload),{url:calendarUrl,file_name:'uchrashuv-1.ics'});
+    await page.evaluate(()=>window.cancelCalendarDownload=true);
+    await page.getByRole('button',{name:'Rejani saqlash',exact:true}).click();
+    await page.getByText('Saqlash bekor qilindi.',{exact:true}).waitFor();
+   } else {
+    const downloading=page.waitForEvent('download');
+    await page.getByRole('button',{name:'Rejani saqlash',exact:true}).click();
+    const file=await downloading;assert.equal(file.suggestedFilename(),'uchrashuv-1.ics');
+    await file.saveAs(path.join(out,`${name}-uchrashuv.ics`));
+    assert.ok((await fs.readFile(path.join(out,`${name}-uchrashuv.ics`),'utf8')).startsWith('BEGIN:VCALENDAR'));
+   }
+   assert.equal(posts.length,2);assert.equal(calendarRequests,name==='mobile'?3:2);
+   await page.reload();await page.getByRole('heading',{name:'Biz uchun kichkina xat'}).waitFor();assert.equal(posts.length,2);
+   recipient='W'.repeat(120);sender='M'.repeat(120);await page.reload();
+   await page.getByRole('heading',{name:'Biz uchun kichkina xat'}).waitFor();await noOverflow();
+   if(name==='small')await page.screenshot({path:path.join(out,'small-long-names.png'),fullPage:true,animations:'disabled'});
+   recipient='Shaxzoda';sender='Javohir';
+   // Sender can rehearse the full flow; final confirmation cannot write.
+   preview=true;saved=null;await page.evaluate(()=>localStorage.clear());await page.reload();
+   await page.getByRole('slider').press('End');await page.getByRole('button',{name:'Ha',exact:true}).click();
+   await page.getByRole('button',{name:'Rejani tanlash'}).click();
+   if(name==='small') {
+    for(let i=0;i<monthDelta;i++)await page.getByRole('button',{name:'Keyingi oy',exact:true}).click();
+    await page.locator(`[data-day="${day}"]`).click();
+    await page.getByLabel('Soat',{exact:true}).selectOption('19');
+    await page.getByLabel('Daqiqa',{exact:true}).selectOption('00');
+   } else await page.locator('input[name="meeting-time"]').first().check();
+   await page.getByRole('button',{name:'Keyingi — rejani tanlash'}).click();await page.getByRole('radio',{name:'Qahva va uzoq suhbat'}).check();
+   assert.equal(await page.getByRole('button',{name:'Uchrashuvni tasdiqlash'}).isDisabled(),true);assert.equal(posts.length,2);
+   assert.deepEqual(errors,[]);console.log(`${name}: six steps, inline calendar, month/year bounds, keyboard, hour/minute, slot time, persistence, no early write, retry, receipt, calendar native/browser download and retry/cancel, preview guard PASS`);
+   await context.close();
+  }
+ } finally {await browser.close();await new Promise(resolve=>files.close(resolve));}
+})().catch(e=>{console.error(e);process.exitCode=1;});
