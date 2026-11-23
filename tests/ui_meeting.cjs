@@ -56,6 +56,7 @@ const out=path.join(root,friendly?'output/friendship':'output/meeting');
    if(friendly) {
     assert.equal(await page.locator('.meeting-heart').count(),0);
     assert.equal(await page.locator('.friendship-brand').innerText(),'QADAM / DO‘STONA');
+    assert.equal(await page.locator('h1').evaluate(el=>getComputedStyle(el).color),'rgb(20, 50, 82)');
     assert.equal(await page.locator('.meeting-action').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(18, 97, 218)');
    }
    await openInvite();
