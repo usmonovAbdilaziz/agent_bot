@@ -15,6 +15,12 @@ from meeting import requires_plan, validate_response
 import json
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS q_meeting_reminders(
+ invite_id INTEGER NOT NULL, uid INTEGER NOT NULL, due_at REAL NOT NULL,
+ meeting_at REAL NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+ retry_at REAL NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0,
+ sent_at REAL, PRIMARY KEY(invite_id,uid));
+CREATE INDEX IF NOT EXISTS q_meeting_reminders_due ON q_meeting_reminders(status,due_at,retry_at);
 CREATE TABLE IF NOT EXISTS q_meeting_responses(
  invite_id INTEGER PRIMARY KEY, when_value TEXT NOT NULL,
  plan TEXT NOT NULL, note TEXT NOT NULL);

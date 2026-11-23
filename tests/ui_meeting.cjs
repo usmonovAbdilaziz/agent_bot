@@ -54,6 +54,8 @@ const out=path.join(root,'output/meeting');
    const no=page.getByRole('button',{name:'Yo‘q — qochadigan hazil tugmasi'});
    const initialYes=await page.getByRole('button',{name:'Ha',exact:true}).boundingBox();
    assert.ok(initialYes.height>=72);
+   const phrases=['Voy, sirpanib ketdim 🫣','Hali ushlamadingiz 😜','Bu tugma sportchi 🏃','Sekinroq, qo‘rqityapsiz 😂','Choyga ham yo‘qmi? ☕','Bir piyola gaplashamiz? 😌','Kalendar ham kutyapti 📅','Men ham uyatchanman 🙈'];
+   let previousLabel='Yo‘q';
    const positions=[];
    for(let i=0;i<10;i++){
     if(i===0&&name==='desktop') {
@@ -65,9 +67,9 @@ const out=path.join(root,'output/meeting');
      return{no:rect('.meeting-no'),yes:rect('.meeting-choices .yes'),label:rect('.meeting-yes-content'),arena:rect('.meeting-choices')};
     });
     const {no:chip,yes,label,arena}=geometry;
-    assert.equal(await no.innerText(),'Yo‘q');
+    const labelText=await no.innerText();assert.ok(phrases.includes(labelText));assert.notEqual(labelText,previousLabel);previousLabel=labelText;
     assert.ok(chip.x>=arena.x&&chip.y>=arena.y&&chip.x+chip.w<=arena.x+arena.w+1&&chip.y+chip.h<=arena.y+arena.h+1);
-    assert.ok(!(chip.x<label.x+label.w&&chip.x+chip.w>label.x&&chip.y<label.y+label.h&&chip.y+chip.h>label.y),'No chip covers Ha label');
+    assert.ok(!(chip.x<label.x+label.w&&chip.x+chip.w>label.x&&chip.y<label.y+label.h&&chip.y+chip.h>label.y),'No chip covers Ha label '+JSON.stringify({name,i,geometry}));
     assert.ok(chip.x<yes.x+yes.w&&chip.x+chip.w>yes.x&&chip.y<yes.y+yes.h&&chip.y+chip.h>yes.y,'No chip must touch Ha border');
     if(positions.length)assert.ok(Math.hypot(chip.x-positions.at(-1)[0],chip.y-positions.at(-1)[1])>35,'Each attempt must visibly move No');
     positions.push([Math.round(chip.x),Math.round(chip.y)]);

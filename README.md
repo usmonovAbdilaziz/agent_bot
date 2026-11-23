@@ -232,3 +232,5 @@ Ceremony havolasi Toshkent vaqti bilan marosim kuni tugaganidan keyin yana 24 so
 ### Uchrashuv yaratish
 
 Taklif yaratish → Ko‘ngilochar → Kim uchun → Kimdan → Sana-vaqt → Oldindan ko‘rish → Tasdiqlash. Dizayn avtomatik tanlanadi. Oluvchi uchrashuv rejasini tasdiqlashi va kalendarga qo‘shishi mumkin.
+
+Uchrashuvda “Yo‘q” tugmasi har urinishda sakkiz hazildan birini tasodifiy ko‘rsatadi; bir xil gap ketma-ket chiqmaydi. Sana-vaqt yakuniy tasdiqda saqlanadi. Bot 15 soniyada eslatmalar navbatini tekshiradi va uchrashuvdan bir soat oldin ikkala ishtirokchiga alohida Telegram xabari yuboradi. Bir soatdan kam vaqt qolgan yangi tasdiq uchun eslatma darhol navbatga tushadi. Restartdan keyin navbat davom etadi; vaqtinchalik xatolar qayta sinaladi, o‘tgan uchrashuvlar yuborilmaydi. Telegram xabarni qabul qilganidan keyin jarayon to‘xtasa, kamdan-kam takroriy yetkazish mumkin: Telegram sendMessage idempotency kaliti bermaydi.

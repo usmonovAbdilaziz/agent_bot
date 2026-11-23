@@ -117,6 +117,52 @@ class App:
                 return
             await self.db.run('UPDATE q_rsvps SET notice_status=? WHERE rowid=?',('sent' if sent else 'failed',response['notice_id']))
 
+    async def send_meeting_reminders(self, now=None):
+        now = time.time() if now is None else now
+        # Persistent scheduling also includes meetings accepted before this release.
+        await self.db.run("""INSERT OR IGNORE INTO q_meeting_reminders(invite_id,uid,due_at,meeting_at)
+            SELECT i.id, u.tg_id, CAST(strftime('%s',r.when_value) AS REAL)-3600,
+                   CAST(strftime('%s',r.when_value) AS REAL)
+            FROM q_meeting_responses r JOIN q_invites i ON i.id=r.invite_id
+            JOIN users u ON u.tg_id=i.sender OR u.tg_id=i.receiver
+            WHERE i.status='accepted' AND i.design='meeting'
+              AND CAST(strftime('%s',r.when_value) AS REAL)>?""", (now,))
+        await self.db.run("UPDATE q_meeting_reminders SET status='expired' WHERE status='pending' AND meeting_at<=?", (now,))
+        rows = await self.db.all("""SELECT n.*, r.when_value, r.plan, r.note, i.title
+            FROM q_meeting_reminders n JOIN q_meeting_responses r ON r.invite_id=n.invite_id
+            JOIN q_invites i ON i.id=n.invite_id
+            WHERE n.status='pending' AND n.due_at<=? AND n.retry_at<=? AND n.meeting_at>?
+              AND i.status='accepted' ORDER BY n.due_at LIMIT 40""", (now,now,now))
+        for row in rows:
+            # Lease prevents concurrent workers from claiming the same delivery.
+            claimed = await self.db.run("""UPDATE q_meeting_reminders SET retry_at=?, attempts=attempts+1
+                WHERE invite_id=? AND uid=? AND status='pending' AND retry_at<=?""",
+                (now+120,row['invite_id'],row['uid'],now))
+            if not claimed: continue
+            user = await self.db.one('SELECT active,is_blocked FROM users WHERE tg_id=?',(row['uid'],))
+            if not user or not user['active'] or user['is_blocked']:
+                await self.db.run("UPDATE q_meeting_reminders SET status='unavailable' WHERE invite_id=? AND uid=?",(row['invite_id'],row['uid']))
+                continue
+            minutes = max(1, int((row['meeting_at']-now+59)//60))
+            text = (f'⏰ <b>Uchrashuv eslatmasi</b>\nUchrashuvgacha taxminan {minutes} daqiqa qoldi.\n'
+                    f'Vaqt: {esc(time_label(row["when_value"]))} (O‘zbekiston vaqti)\n'
+                    f'Reja: {esc(PLANS.get(row["plan"],row["plan"]))}')
+            if row['note']: text += f'\nIzoh: {esc(row["note"])}'
+            try:
+                sent = await asyncio.wait_for(self.send(row['uid'],text),timeout=15)
+            except (TelegramAPIError, OSError, TimeoutError) as exc:
+                logging.warning('Uchrashuv eslatmasi keyinroq yuboriladi: %s',type(exc).__name__)
+                await self.db.run("UPDATE q_meeting_reminders SET retry_at=? WHERE invite_id=? AND uid=? AND status='pending'",(now+60,row['invite_id'],row['uid']))
+                continue
+            await self.db.run("UPDATE q_meeting_reminders SET status=?,sent_at=? WHERE invite_id=? AND uid=?",
+                              ('sent' if sent else 'unavailable',time.time() if sent else None,row['invite_id'],row['uid']))
+
+    async def meeting_notifications(self):
+        while True:
+            try: await self.send_meeting_reminders()
+            except Exception as exc: logging.error('Uchrashuv eslatmalari: %s',type(exc).__name__)
+            await asyncio.sleep(15)
+
     async def acceptance_notifications(self):
         while True:
             try:
@@ -993,6 +1039,7 @@ async def main():
         from webapp import start_web_app
         runner=await start_web_app(app)
         notices = asyncio.create_task(app.acceptance_notifications())
+        reminders = asyncio.create_task(app.meeting_notifications())
         try:
             await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
             await bot.set_my_commands([BotCommand(command='start',description='Boshlash yoki davom etish'),BotCommand(command='check',description='Taklif turini tanlash'),BotCommand(command='taklif',description='Taklif yuborish'),BotCommand(command='guests',description='Mehmonlar ro‘yxati')])
@@ -1002,6 +1049,9 @@ async def main():
             await dispatcher(app).start_polling(bot,handle_as_tasks=False)
         finally:
             app.ready=False
+            reminders.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await reminders
             notices.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await notices

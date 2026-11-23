@@ -46,7 +46,7 @@ main:has(.meeting-flow) #status { color: #71394a; }
 .meeting-choices .yes:not(:disabled):active { transform: translateX(-50%) scale(.98); }
 .meeting-yes-content { display: inline-flex; align-items: center; gap: 10px; pointer-events: none; }
 .meeting-yes-content svg { width: 24px; height: 24px; fill: currentColor; }
-.meeting-no { position: absolute; z-index: 1; left: 8px; top: 16px; min-height: 44px; width: 66px; max-width: calc(100% - 8px); padding: 7px 10px; border: 1px solid #ddd5c7; border-radius: 999px; font-size: 12px; line-height: 1.25; color: #625344; background: #fbf8ef; box-shadow: none; }
+.meeting-flow .meeting-no { position: absolute; z-index: 1; left: 8px; top: 16px; height: 52px; min-height: 52px; width: 148px; max-width: calc(100% - 8px); padding: 7px 10px; border: 1px solid #ddd5c7; border-radius: 999px; font-size: 12px; line-height: 1.25; color: #625344; background: #fbf8ef; box-shadow: none; }
 .meeting-hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .meeting-flow.meeting-celebrate { background: #922d45; color: #fff9f2; text-align: center; padding-top: 100px; }
 .meeting-celebrate-heart { display: grid; place-items: center; width: 90px; height: 90px; margin: 0 auto 34px; border-radius: 50%; background: #f9eedc; color: #922d45; }

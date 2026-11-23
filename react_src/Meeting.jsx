@@ -42,7 +42,13 @@ function JoinedHeart({ progress = 100 }) {
   </svg>;
 }
 
+const noMessages = [
+  'Voy, sirpanib ketdim 🫣', 'Hali ushlamadingiz 😜', 'Bu tugma sportchi 🏃',
+  'Sekinroq, qo‘rqityapsiz 😂', 'Choyga ham yo‘qmi? ☕', 'Bir piyola gaplashamiz? 😌',
+  'Kalendar ham kutyapti 📅', 'Men ham uyatchanman 🙈',
+];
 function Choice({ onYes, onNo, attempts }) {
+  const [noLabel, setNoLabel] = useState('Yo‘q');
   const [position, setPosition] = useState(null);
   const arena = useRef(null);
   const yes = useRef(null);
@@ -81,8 +87,8 @@ function Choice({ onYes, onNo, attempts }) {
           nx = Math.cos(angle); ny = Math.sin(angle);
           x = primary.left + radius + radius * nx; y = primary.top + radius + radius * ny;
         }
-        const left = Math.max(bounds.left + 4, Math.min(bounds.right - chip.width - 4, x + nx * 12 - chip.width / 2));
-        const top = Math.max(bounds.top + 4, Math.min(bounds.bottom - chip.height - 4, y + ny * 12 - chip.height / 2));
+        const left = Math.max(bounds.left + 4, Math.min(bounds.right - chip.width - 4, x + nx * 20 - chip.width / 2));
+        const top = Math.max(bounds.top + 4, Math.min(bounds.bottom - chip.height - 4, y + ny * 20 - chip.height / 2));
         const right = left + chip.width, bottom = top + chip.height;
         if (left < label.right + 10 && right > label.left - 10 && top < label.bottom + 10 && bottom > label.top - 10) continue;
         if (pointer.current && pointer.current.x > left - 14 && pointer.current.x < right + 14 && pointer.current.y > top - 14 && pointer.current.y < bottom + 14) continue;
@@ -113,6 +119,10 @@ function Choice({ onYes, onNo, attempts }) {
   function evade(event) {
     event.preventDefault();
     if (event.type.startsWith('pointer')) pointer.current = { x: event.clientX, y: event.clientY };
+    setNoLabel(previous => {
+      const choices = noMessages.filter(message => message !== previous);
+      return choices[Math.floor(Math.random() * choices.length)];
+    });
     onNo();
     tg?.HapticFeedback?.impactOccurred('light');
   }
@@ -122,7 +132,7 @@ function Choice({ onYes, onNo, attempts }) {
     <button ref={no} type="button" className="meeting-no" style={position || undefined}
       onPointerEnter={event => { if (event.pointerType === 'mouse') evade(event); }}
       onPointerDown={evade} onClick={event => { if (event.detail === 0) evade(event); else event.preventDefault(); }}
-      aria-label="Yo‘q — qochadigan hazil tugmasi" aria-describedby={attempts ? hintId : undefined}>Yo‘q</button>
+      aria-label="Yo‘q — qochadigan hazil tugmasi" aria-describedby={attempts ? hintId : undefined}>{noLabel}</button>
     {attempts > 0 && <p id={hintId} className="meeting-hint" role="status">{hint}</p>}
   </div>;
 }
