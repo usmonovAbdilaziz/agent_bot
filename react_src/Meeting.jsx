@@ -63,7 +63,7 @@ function Choice({ onYes, onNo, attempts, friendly }) {
   const hint = ['Yana bir bor o‘ylab ko‘rasizmi?', 'Birga yaxshi vaqt o‘tkazamiz.', 'Ha desangiz, rejani tanlaymiz.'][Math.max(0, attempts - 1) % 3];
 
   useLayoutEffect(() => {
-    function relocate() {
+    function relocate(randomize = true) {
       const bounds = arena.current.getBoundingClientRect();
       const primary = yes.current.getBoundingClientRect();
       const label = content.current.getBoundingClientRect();
@@ -98,9 +98,11 @@ function Choice({ onYes, onNo, attempts, friendly }) {
         candidates.push({ left: left - bounds.left, top: top - bounds.top });
       }
       const distant = candidates.filter(point => !last.current || Math.hypot(point.left - last.current.left, point.top - last.current.top) > 40);
-      const options = distant.length ? distant : candidates;
+      const options = randomize && distant.length ? distant : candidates;
       if (!options.length) return;
-      const next = options[Math.floor(Math.random() * options.length)];
+      const next = randomize || !last.current
+        ? options[Math.floor(Math.random() * options.length)]
+        : options.reduce((best, point) => Math.hypot(point.left-last.current.left, point.top-last.current.top) < Math.hypot(best.left-last.current.left, best.top-last.current.top) ? point : best);
       last.current = next;
       setPosition(next);
     }
@@ -108,20 +110,20 @@ function Choice({ onYes, onNo, attempts, friendly }) {
     let initialObservation = true;
     const observer = new ResizeObserver(() => {
       if (initialObservation) { initialObservation = false; return; }
-      relocate();
+      const bounds = arena.current.getBoundingClientRect();
+      const chip = no.current.getBoundingClientRect();
+      const label = content.current.getBoundingClientRect();
+      const outside = chip.left < bounds.left || chip.right > bounds.right || chip.top < bounds.top || chip.bottom > bounds.bottom;
+      const overlaps = chip.left < label.right + 10 && chip.right > label.left - 10 && chip.top < label.bottom + 10 && chip.bottom > label.top - 10;
+      if (outside || overlaps) relocate(false);
     });
     observer.observe(arena.current); observer.observe(yes.current); observer.observe(no.current);
-    const timer = window.setInterval(() => {
-      if (document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches
-          || document.activeElement === no.current || document.activeElement === yes.current) return;
-      relocate();
-    }, 1800);
-    return () => { observer.disconnect(); window.clearInterval(timer); };
+    return () => observer.disconnect();
   }, [attempts]);
 
   function evade(event) {
     event.preventDefault();
-    if (event.type.startsWith('pointer')) pointer.current = { x: event.clientX, y: event.clientY };
+    pointer.current = event.detail > 0 ? { x: event.clientX, y: event.clientY } : null;
     setNoLabel(previous => {
       const choices = noMessages.filter(message => message !== previous);
       return choices[Math.floor(Math.random() * choices.length)];
@@ -133,8 +135,7 @@ function Choice({ onYes, onNo, attempts, friendly }) {
     onPointerMove={event => { pointer.current = { x: event.clientX, y: event.clientY }; }} onPointerLeave={() => { pointer.current = null; }}>
     <button ref={yes} type="button" className="meeting-action yes" onClick={onYes}><span ref={content} className="meeting-yes-content"><Icon kind={friendly ? "friends" : "heart"} /> Ha</span></button>
     <button ref={no} type="button" className="meeting-no" style={position || undefined}
-      onPointerEnter={event => { if (event.pointerType === 'mouse') evade(event); }}
-      onPointerDown={evade} onClick={event => { if (event.detail === 0) evade(event); else event.preventDefault(); }}
+      onClick={evade}
       aria-label="Yo‘q — qochadigan hazil tugmasi" aria-describedby={attempts ? hintId : undefined}>{noLabel}</button>
     {attempts > 0 && <p id={hintId} className="meeting-hint" role="status">{hint}</p>}
   </div>;

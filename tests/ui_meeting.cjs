@@ -67,11 +67,17 @@ const out=path.join(root,friendly?'output/friendship':'output/meeting');
    const phrases=['Voy, sirpanib ketdim 🫣','Hali ushlamadingiz 😜','Bu tugma sportchi 🏃','Sekinroq, qo‘rqityapsiz 😂','Choyga ham yo‘qmi? ☕','Bir piyola gaplashamiz? 😌','Kalendar ham kutyapti 📅','Men ham uyatchanman 🙈'];
    let previousLabel='Yo‘q';
    const positions=[];
+   // Hover and time passing must not move or count the button.
+   await page.emulateMedia({reducedMotion:'no-preference'});
+   const idleBox=await no.boundingBox();
+   await page.mouse.move(idleBox.x+idleBox.width/2,idleBox.y+idleBox.height/2);
+   await page.waitForTimeout(2100);
+   assert.deepEqual(await no.boundingBox(),idleBox);
+   assert.equal(await no.innerText(),'Yo‘q');
+   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('qadam:meeting:2:1:reply')).attempts),0);
    for(let i=0;i<10;i++){
-    if(i===0&&name==='desktop') {
-     const box=await no.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
-    } else if(i===0) await no.tap();
-    else {await no.focus();await page.keyboard.press('Enter');}
+    if(i<3) { if(name==='desktop') await no.click(); else await no.tap(); }
+    else {await no.focus();await page.keyboard.press(i%2?'Enter':'Space');}
     assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('qadam:meeting:2:1:reply')).attempts),i+1,`${name}: attempt ${i+1}`);
     const geometry=await page.evaluate(()=>{
      const rect=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height};};
@@ -91,23 +97,12 @@ const out=path.join(root,friendly?'output/friendship':'output/meeting');
    assert.ok(grownYes.height>initialYes.height&&grownYes.width>=initialYes.width);
    await page.getByRole('heading',{name:'Shaxzoda, uchrashamizmi?'}).focus();
    await noOverflow();await shot('question-active');
-   if(name==='mobile') {
-    // Reduced motion pauses idle movement; normal idle relocation never counts a No.
-    const still=await no.boundingBox();await page.waitForTimeout(1900);
-    assert.deepEqual(await no.boundingBox(),still);
-    await page.emulateMedia({reducedMotion:'no-preference'});await page.reload();
-    await page.getByRole('heading',{name:'Shaxzoda, uchrashamizmi?'}).waitFor();
-    await page.waitForTimeout(100);
-    await page.screenshot({path:path.join(out,'mobile-orbit-0.png'),fullPage:true});
-    for(let frame=1;frame<=2;frame++) {
-     const before=await no.boundingBox();
-     await page.waitForFunction(({x,y})=>{const r=document.querySelector('.meeting-no').getBoundingClientRect();return Math.abs(r.x-x)+Math.abs(r.y-y)>2;},before,{timeout:5000});
-     assert.equal(await no.innerText(),'Yo‘q');
-     await page.screenshot({path:path.join(out,`mobile-orbit-${frame}.png`),fullPage:true});
-    }
-    await page.emulateMedia({reducedMotion:'reduce'});
-    assert.equal(posts.length,0);
-   }
+   // The randomized label remains clickable repeatedly, then stays still.
+   const settled=await no.boundingBox();const settledLabel=await no.innerText();
+   await page.mouse.move(0,0);await page.waitForTimeout(2100);
+   assert.deepEqual(await no.boundingBox(),settled);
+   assert.equal(await no.innerText(),settledLabel);
+   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('qadam:meeting:2:1:reply')).attempts),10);
    assert.equal(posts.length,0);
    const yesButton=page.getByRole('button',{name:'Ha',exact:true});
    if(name==='desktop') await yesButton.click();

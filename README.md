@@ -241,3 +241,6 @@ Uchrashuv sahifasida foydalanuvchi bergan “SXYBIT — Love You” MP3 fon musi
 Ko‘ngilochar bo‘limida **Do‘stona** va **Sevgi** yo‘nalishlari bor. Sevgi avvalgi yurakli uchrashuv ko‘rinishini saqlaydi. Do‘stona ko‘k-oq ranglar, suhbat belgisi va do‘stona matnlar bilan ochiladi; qahva, kino/sayr yoki o‘yin rejalarini tanlash mumkin. Har ikki yo‘nalishda kun-vaqt, izoh, tasdiqlash va kalendarga saqlash ishlaydi. Eski uchrashuv havolalari Sevgi ko‘rinishida qoladi.
 
 Do‘stona brauzer tekshiruvi: `node tests/ui_meeting.cjs --friendship`.
+
+
+Do‘stona va Sevgi uchrashuvlarida «Yo‘q» tugmasi faqat bosilganda (sichqoncha, teginish yoki Enter/Space) tasodifiy yozuv va yangi joyga o‘tadi. Kutish yoki sichqonchani ustiga olib borish tugmani siljitmaydi va urinish sanog‘ini oshirmaydi.
