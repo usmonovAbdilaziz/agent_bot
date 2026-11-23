@@ -43,7 +43,7 @@ const out=path.join(root,'output/meeting');
      status:saved?'accepted':'ready',details:{meeting_recipient:recipient,meeting_sender:sender,meeting_slots:name==='small'?[]:[when],meeting_configured:true,meeting_response:saved}
     })});
     const file=url.pathname==='/'?'index.html':path.basename(url.pathname);
-    return route.fulfill({contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':file.endsWith('.ttf')?'font/ttf':'text/html',body:await fs.readFile(path.join(root,'web_minimal',file))});
+    return route.fulfill({contentType:file.endsWith('.mp3')?'audio/mpeg':file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':file.endsWith('.ttf')?'font/ttf':'text/html',body:await fs.readFile(path.join(root,'web_minimal',file))});
    });
    const shot=async phase=>{if(name==='mobile'||phase==='letter'||phase==='when'||phase==='question-active')await page.screenshot({path:path.join(out,`${name}-${phase}.png`),fullPage:true,animations:'disabled'});};
    const noOverflow=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);

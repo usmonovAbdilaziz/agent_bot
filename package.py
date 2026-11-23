@@ -14,7 +14,7 @@ def build(windows=False, target=None):
     files=[ROOT/name for name in FILES]
     files += [p for p in (ROOT/'wedding_assets').rglob('*') if p.is_file()]
     files += [p for folder in ('tests','postman','web','web_minimal','react_src') for p in (ROOT/folder).rglob('*')
-              if p.is_file() and '__pycache__' not in p.parts and p.suffix in ('.py','.js','.jsx','.yaml','.json','.html','.css','.cjs','.md','.webp','.png','.ttf','.sql')]
+              if p.is_file() and '__pycache__' not in p.parts and p.suffix in ('.py','.js','.jsx','.yaml','.json','.html','.css','.cjs','.md','.webp','.png','.ttf','.sql','.mp3')]
     target=Path(target) if target is not None else ROOT.parent/('agent_bot_windows.zip' if windows else 'agent_bot_minimal.zip')
     target.parent.mkdir(parents=True,exist_ok=True)
     with ZipFile(target,'w',ZIP_DEFLATED) as z:

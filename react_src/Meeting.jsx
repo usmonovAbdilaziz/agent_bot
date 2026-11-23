@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
 import plans from './meeting-data.json';
 import MeetingDateTime from './MeetingDateTime';
+import MeetingAtmosphere from './MeetingAtmosphere';
 import './meeting.css';
 
 const tg = window.Telegram?.WebApp;
@@ -142,6 +143,12 @@ function DateSummary({ when }) {
 }
 
 export default function Meeting({ invite, api, onStatus, renderMedia }) {
+  const [reaction, setReaction] = useState(null);
+  const reactionId = useRef(0);
+  function react(kind) {
+    const choices = {no:['🙈','😸','🫣','💨'],yes:['💞','🥰','🧸'],date:['📅','🌟','🕰️'],coffee:['☕','🫖','🍪'],cinema:['🎬','🍿','🎟️'],dinner:['🍽️','🥂','🕯️'],surprise:['🎁','✨','💝'],games:['🎳','🎯','🎮'],saved:['💌','💖','🎉']}[kind] || ['💖'];
+    setReaction({id:++reactionId.current,kind,emoji:choices[Math.floor(Math.random()*choices.length)]});
+  }
   const config = invite.details || {};
   const recipient = config.meeting_recipient || invite.title;
   const sender = config.meeting_sender || '';
@@ -180,11 +187,11 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, [draft.phase, complete]);
   function patch(value) { setDraft(old => ({ ...old, ...value })); }
   function phase(value) { setError(''); onStatus(''); patch({ phase: value }); }
-  function no() { attempts.current = Math.min(attempts.current + 1, 1_000_000); patch({ attempts: attempts.current }); }
+  function no() { react('no'); attempts.current = Math.min(attempts.current + 1, 1_000_000); patch({ attempts: attempts.current }); }
   function nextTime(event) {
     event.preventDefault();
     if (!validWhen) { setError('Kelajakdagi kun va vaqtni tanlang.'); return; }
-    patch({ when: selectedWhen, phase: 'plan' }); setError('');
+    react('date'); patch({ when: selectedWhen, phase: 'plan' }); setError('');
   }
   async function confirm(event) {
     event.preventDefault();
@@ -198,7 +205,7 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
       // Re-read the server's frozen choices, including after an ambiguous network retry.
       const saved = await api(`/invites/${invite.id}`);
       if (!saved.details?.meeting_response) throw new Error('Javobni qayta ochib tekshiring.');
-      setReceipt(saved.details.meeting_response); setComplete(true);
+      setReceipt(saved.details.meeting_response); setComplete(true); react('saved');
       tg?.HapticFeedback?.notificationOccurred('success');
     } catch (reason) { setError(reason?.message || 'Javob saqlanmadi. Qayta urinib ko‘ring.'); }
     finally { busy.current = false; setSaving(false); }
@@ -224,6 +231,7 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
   }
   const title = text => <h1 ref={heading} tabIndex={-1}>{text}</h1>;
   return <section className={`invitation design-meeting meeting-flow meeting-${complete ? 'letter' : draft.phase}`}>
+    <MeetingAtmosphere reaction={reaction} />
     {invite.preview && <p className="meeting-preview">Ko‘rinishni sinab ko‘rishingiz mumkin. Yakuniy javob yuborilmaydi.</p>}
     {error && <p className="meeting-error" role="alert">{error}</p>}
     {complete ? <>
@@ -261,7 +269,7 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
         {renderMedia?.(invite)}
         {title(<>{recipient},<br />uchrashamizmi?</>)}
         <p className="description">{invite.description}</p>
-        <Choice onYes={() => phase('celebrate')} onNo={no} attempts={draft.attempts} />
+        <Choice onYes={() => { react('yes'); phase('celebrate'); }} onNo={no} attempts={draft.attempts} />
       </article>
     </> : draft.phase === 'celebrate' ? <>
       <div className="meeting-celebrate-heart"><Icon /></div>
@@ -292,7 +300,7 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
       {validWhen && <DateSummary when={selectedWhen} />}
       <fieldset className="meeting-plan-options"><legend>Nima qilamiz?</legend>
         {plans.map(plan => <label key={plan.id} className={draft.plan === plan.id ? 'selected' : ''}>
-          <input type="radio" name="meeting-plan" value={plan.id} checked={draft.plan === plan.id} disabled={saving} onChange={() => patch({ plan: plan.id })} />
+          <input type="radio" name="meeting-plan" value={plan.id} checked={draft.plan === plan.id} disabled={saving} onChange={() => { react(plan.id); patch({ plan: plan.id }); }} />
           <Icon kind={plan.icon} /><span>{plan.label}</span>
         </label>)}
       </fieldset>
