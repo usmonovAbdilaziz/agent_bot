@@ -94,3 +94,6 @@ Ceremony `GET` javobidagi `rsvp_closed` marosim kuni Toshkent vaqtida tugagach `
 Feature flag `ENABLE_CEREMONY` controls new bot creation only (default false). Existing ceremony links, RSVP and guest access remain available when off.
 
 New ceremony links expire at midnight Asia/Tashkent following the event day plus 24 hours, capped at 400 days after publication. Fun retains configured TTL; existing stored expiry is unchanged. RSVP closes at event-day midnight, returning HTTP 409 with `code: rsvp_closed` for a new response. Authenticated media supports a single byte Range (206, or 416 for invalid/unsatisfiable range). Media downloads are single-flight per file with configurable global concurrency (default 4), per-user request rate (default 120/minute), shared in-memory 16 MiB/64-entry cache, 2 MiB item limit and 15-minute TTL; no media is written to disk.
+
+
+Meeting public details include `meeting_kind`: `friendship` or `love`. Missing or unknown stored values default to `love` for existing invitation links. The bot selects the direction before collecting meeting details; the API continues using `type=fun`, `design=meeting` and the existing acceptance/calendar endpoints.

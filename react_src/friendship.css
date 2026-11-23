@@ -1,0 +1,56 @@
+body:has(.meeting-friendly) { background: #edf5ff; }
+main:has(.meeting-friendly) #status { color: #234d78; }
+.meeting-flow.meeting-friendly {
+  --meeting-accent: #1261da; --meeting-ink: #143252; --meeting-muted: #486581;
+  --meeting-paper: #fff; --meeting-soft: #f0f7ff; --meeting-line: #c5dbf2;
+  --text: #143252; --accent: #1261da; --muted: #486581;
+  background: #fff; border: 1px solid #d8e7f7; border-radius: 28px;
+  padding-top: 26px; box-shadow: 0 18px 60px #255b9d12;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.meeting-friendly h1, .meeting-friendly h2,
+.meeting-friendly .meeting-time-option > span, .meeting-friendly .meeting-signature {
+  font-family: inherit; font-style: normal; font-weight: 750; overflow-wrap: anywhere;
+}
+.meeting-friendly h1 { color: #143252; font-size: clamp(28px, 7vw, 40px); letter-spacing: -.04em; }
+.friendship-brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #1261da; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-align: left; }
+.friendship-brand > svg { width: 26px; height: 26px; }
+.meeting-friendly .friendship-art { position: relative; height: 220px; margin: 26px -8px 20px; isolation: isolate; }
+.friendship-orbit { position: absolute; z-index: -1; border: 1px dashed #a6c9f3; border-radius: 50%; inset: 8px 15px; transform: rotate(-20deg); }
+.friendship-orbit.orbit-two { inset: 32px 40px; background: #e9f3ff; border: 0; transform: rotate(25deg); }
+.friendship-bubble { position: absolute; display: flex; align-items: center; gap: 12px; padding: 22px 20px; border-radius: 22px 22px 22px 4px; font-size: 14px; font-weight: 700; box-shadow: 0 12px 24px #1d5aab18; }
+.friendship-bubble svg { width: 32px; height: 32px; }
+.bubble-blue { top: 30px; left: 6px; color: #fff; background: #1261da; transform: rotate(-7deg); }
+.bubble-white { bottom: 28px; right: 5px; background: #fff; color: #1261da; border: 1px solid #c5dbf2; border-radius: 22px 22px 4px 22px; transform: rotate(6deg); }
+.friendship-spark { position: absolute; right: 10px; top: 12px; font-size: 32px; color: #1261da; }
+.meeting-friendly .friendship-eyebrow { color: #1261da; font-size: 9px; font-weight: 800; letter-spacing: .12em; }
+.meeting-friendly.meeting-intro h1 { margin: 14px 0 18px; }
+.meeting-friendly .description { max-width: 34ch; line-height: 1.7; }
+.meeting-friendly .meeting-action { border-radius: 14px; background: #1261da; color: #fff; box-shadow: 0 7px 16px #1261da20; }
+.friendship-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 20px; color: #486581; font-size: 10px; }
+.friendship-tags span { display: flex; align-items: center; gap: 4px; }
+.friendship-tags svg { width: 14px; height: 14px; }
+.meeting-friendly .meeting-from { border-top: 1px solid #e2edf8; padding-top: 18px; letter-spacing: 0; font-size: 12px; }
+.meeting-friendly .meeting-question-paper { margin-top: 28px; background: #f0f7ff; box-shadow: none; border: 1px solid #d8e7f7; }
+.meeting-friendly .meeting-choices .yes { border-radius: 999px; }
+.meeting-friendly .meeting-yes-content svg, .meeting-friendly .meeting-letter-heart { fill: none; }
+.meeting-friendly .meeting-celebrate-heart { color: #1261da; }
+.meeting-friendly .meeting-celebrate-heart svg { fill: none; }
+.meeting-friendly .meeting-letter-paper { background: #f0f7ff; box-shadow: none; border-top: 5px solid #1261da; }
+.meeting-friendly .meeting-letter-paper .meeting-date-summary { background: #fff; }
+.meeting-friendly .meeting-form-top { margin-top: 24px; }
+.meeting-friendly .meeting-time-option.selected, .meeting-friendly .meeting-plan-options label.selected { --meeting-paper: #1261da; color: #fff; }
+.meeting-friendly .meeting-plan-options label:last-child { grid-column: 1 / -1; }
+@media (max-width: 360px) {
+  .meeting-flow.meeting-friendly { padding: 22px 16px; }
+  .meeting-friendly .friendship-art { height: 195px; }
+  .friendship-bubble { font-size: 11px; padding: 18px 12px; gap: 8px; }
+  .friendship-bubble svg { width: 26px; height: 26px; }
+  .friendship-tags { gap: 8px; }
+  .meeting-friendly .meeting-question-paper h1 { font-size: 24px; }
+}
+
+.meeting-friendly.meeting-celebrate { color: #143252; padding-top: 26px; }
+.meeting-friendly.meeting-celebrate > p { color: #486581; }
+.meeting-friendly.meeting-celebrate .meeting-celebrate-heart { margin-top: 70px; background: #edf5ff; }
+.meeting-friendly.meeting-celebrate h1 { font-style: normal; }

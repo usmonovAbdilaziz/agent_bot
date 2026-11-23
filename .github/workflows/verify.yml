@@ -29,6 +29,7 @@ jobs:
       - run: npm run test:ui
       - run: node tests/ui_wedding.cjs
       - run: node tests/ui_meeting.cjs
+      - run: node tests/ui_meeting.cjs --friendship
       - run: node tests/ui_meeting_audio.cjs
       - run: git diff --exit-code -- web_minimal
       - run: node tests/ui_m6_contrast.cjs

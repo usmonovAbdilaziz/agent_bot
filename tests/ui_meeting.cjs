@@ -5,7 +5,9 @@ const fs=require('node:fs/promises');
 const path=require('node:path');
 const http=require('node:http');
 const root=path.resolve(__dirname,'..');
-const out=path.join(root,'output/meeting');
+const friendly=process.argv.includes('--friendship');
+const receiptHeading=friendly?'Kelishdik, do‘stim!':'Biz uchun kichkina xat';
+const out=path.join(root,friendly?'output/friendship':'output/meeting');
 
 (async()=>{
  await fs.mkdir(out,{recursive:true});
@@ -40,7 +42,7 @@ const out=path.join(root,'output/meeting');
     }
     if(url.pathname.startsWith('/api/')) return route.fulfill({contentType:'application/json',body:JSON.stringify({
      id:1,title:'Uchrashuv',description:'Bir piyola choy ustida suhbatlashamiz.',media_kind:'none',type:'fun',design:'meeting',preview,
-     status:saved?'accepted':'ready',details:{meeting_recipient:recipient,meeting_sender:sender,meeting_slots:name==='small'?[]:[when],meeting_configured:true,meeting_response:saved}
+     status:saved?'accepted':'ready',details:{meeting_kind:friendly?'friendship':'love',meeting_recipient:recipient,meeting_sender:sender,meeting_slots:name==='small'?[]:[when],meeting_configured:true,meeting_response:saved}
     })});
     const file=url.pathname==='/'?'index.html':path.basename(url.pathname);
     return route.fulfill({contentType:file.endsWith('.mp3')?'audio/mpeg':file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':file.endsWith('.ttf')?'font/ttf':'text/html',body:await fs.readFile(path.join(root,'web_minimal',file))});
@@ -48,8 +50,15 @@ const out=path.join(root,'output/meeting');
    const shot=async phase=>{if(name==='mobile'||phase==='letter'||phase==='when'||phase==='question-active')await page.screenshot({path:path.join(out,`${name}-${phase}.png`),fullPage:true,animations:'disabled'});};
    const noOverflow=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    await page.goto('http://meeting.test/?invite=1');
-   await page.getByRole('slider').waitFor();await noOverflow();await shot('intro');
-   await page.getByRole('slider').press('End');
+   const openInvite=async()=>friendly?await page.getByRole('button',{name:'Taklifni ochish'}).click():await page.getByRole('slider').press('End');
+   await (friendly?page.getByRole('button',{name:'Taklifni ochish'}):page.getByRole('slider')).waitFor();
+   await noOverflow();await shot('intro');
+   if(friendly) {
+    assert.equal(await page.locator('.meeting-heart').count(),0);
+    assert.equal(await page.locator('.friendship-brand').innerText(),'QADAM / DO‘STONA');
+    assert.equal(await page.locator('.meeting-action').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(18, 97, 218)');
+   }
+   await openInvite();
    await page.getByRole('heading',{name:'Shaxzoda, uchrashamizmi?'}).waitFor();await noOverflow();await shot('question');
    const no=page.getByRole('button',{name:'Yo‘q — qochadigan hazil tugmasi'});
    const initialYes=await page.getByRole('button',{name:'Ha',exact:true}).boundingBox();
@@ -62,6 +71,7 @@ const out=path.join(root,'output/meeting');
      const box=await no.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
     } else if(i===0) await no.tap();
     else {await no.focus();await page.keyboard.press('Enter');}
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('qadam:meeting:2:1:reply')).attempts),i+1,`${name}: attempt ${i+1}`);
     const geometry=await page.evaluate(()=>{
      const rect=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height};};
      return{no:rect('.meeting-no'),yes:rect('.meeting-choices .yes'),label:rect('.meeting-yes-content'),arena:rect('.meeting-choices')};
@@ -98,7 +108,9 @@ const out=path.join(root,'output/meeting');
     assert.equal(posts.length,0);
    }
    assert.equal(posts.length,0);
-   await page.getByRole('button',{name:'Ha',exact:true}).click();
+   const yesButton=page.getByRole('button',{name:'Ha',exact:true});
+   if(name==='desktop') await yesButton.click();
+   else { await yesButton.focus(); await yesButton.press('Enter'); }
    await page.getByRole('heading',{name:'Ajoyib, uchrashamiz!'}).waitFor();assert.equal(posts.length,0);await shot('celebrate');
    await page.getByRole('button',{name:'Rejani tanlash'}).click();
    await page.getByRole('heading',{name:'Kun va vaqtni tanlang'}).waitFor();
@@ -136,6 +148,7 @@ const out=path.join(root,'output/meeting');
    await noOverflow();await shot('when');
    await page.getByRole('button',{name:'Keyingi — rejani tanlash'}).click();
    await page.getByRole('heading',{name:'Reja va tilakni tanlang'}).waitFor();
+   if(friendly) assert.equal(await page.getByRole('radio',{name:'Ikki kishilik kechki ovqat'}).count(),0);
    assert.equal(await page.getByRole('button',{name:'Uchrashuvni tasdiqlash'}).isDisabled(),true);
    await page.getByRole('radio',{name:'Qahva va uzoq suhbat'}).check();
    await page.getByLabel('Sizdan bir-ikki og‘iz — ixtiyoriy').fill('Sinov izohi — kelishdik.');
@@ -149,7 +162,7 @@ const out=path.join(root,'output/meeting');
    await page.getByText('Sinov: aloqa uzildi. Qayta urinib ko‘ring.').waitFor();
    assert.equal(await page.locator('.meeting-letter').count(),0);
    await page.getByRole('button',{name:'Uchrashuvni tasdiqlash'}).click();
-   await page.getByRole('heading',{name:'Biz uchun kichkina xat'}).waitFor();
+   await page.getByRole('heading',{name:receiptHeading}).waitFor();
    assert.equal(posts.length,2);assert.equal(posts[1].no_attempts,10);
    assert.deepEqual(saved,{when,plan:'coffee',note:'Sinov izohi — kelishdik.'});
    await noOverflow();await shot('letter');
@@ -170,14 +183,14 @@ const out=path.join(root,'output/meeting');
     assert.ok((await fs.readFile(path.join(out,`${name}-uchrashuv.ics`),'utf8')).startsWith('BEGIN:VCALENDAR'));
    }
    assert.equal(posts.length,2);assert.equal(calendarRequests,name==='mobile'?3:2);
-   await page.reload();await page.getByRole('heading',{name:'Biz uchun kichkina xat'}).waitFor();assert.equal(posts.length,2);
+   await page.reload();await page.getByRole('heading',{name:receiptHeading}).waitFor();assert.equal(posts.length,2);
    recipient='W'.repeat(120);sender='M'.repeat(120);await page.reload();
-   await page.getByRole('heading',{name:'Biz uchun kichkina xat'}).waitFor();await noOverflow();
+   await page.getByRole('heading',{name:receiptHeading}).waitFor();await noOverflow();
    if(name==='small')await page.screenshot({path:path.join(out,'small-long-names.png'),fullPage:true,animations:'disabled'});
    recipient='Shaxzoda';sender='Javohir';
    // Sender can rehearse the full flow; final confirmation cannot write.
    preview=true;saved=null;await page.evaluate(()=>localStorage.clear());await page.reload();
-   await page.getByRole('slider').press('End');await page.getByRole('button',{name:'Ha',exact:true}).click();
+   await openInvite();await page.getByRole('button',{name:'Ha',exact:true}).click();
    await page.getByRole('button',{name:'Rejani tanlash'}).click();
    if(name==='small') {
     for(let i=0;i<monthDelta;i++)await page.getByRole('button',{name:'Keyingi oy',exact:true}).click();

@@ -3,6 +3,7 @@ import plans from './meeting-data.json';
 import MeetingDateTime from './MeetingDateTime';
 import MeetingAtmosphere from './MeetingAtmosphere';
 import './meeting.css';
+import './friendship.css';
 
 const tg = window.Telegram?.WebApp;
 const phases = ['intro', 'question', 'celebrate', 'when', 'plan'];
@@ -18,6 +19,7 @@ function timeLabel(value) { const d = uzDate(value); return `${String(d.getUTCHo
 
 function Icon({ kind = 'heart', ...props }) {
   const paths = {
+    friends: 'M4 20v-2a5 5 0 0 1 10 0v2M18 8a3 3 0 0 1 0 6m-1 2a4 4 0 0 1 4 4M12 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
     heart: 'M12 20s-8-4.8-8-10a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.2-8 10-8 10Z',
     calendar: 'M5 5h14v15H5ZM8 3v4m8-4v4M5 10h14M8 13h2m3 0h3m-8 3h2',
     clock: 'M12 8v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',
@@ -48,7 +50,7 @@ const noMessages = [
   'Sekinroq, qo‘rqityapsiz 😂', 'Choyga ham yo‘qmi? ☕', 'Bir piyola gaplashamiz? 😌',
   'Kalendar ham kutyapti 📅', 'Men ham uyatchanman 🙈',
 ];
-function Choice({ onYes, onNo, attempts }) {
+function Choice({ onYes, onNo, attempts, friendly }) {
   const [noLabel, setNoLabel] = useState('Yo‘q');
   const [position, setPosition] = useState(null);
   const arena = useRef(null);
@@ -129,7 +131,7 @@ function Choice({ onYes, onNo, attempts }) {
   }
   return <div className="meeting-choices" ref={arena} style={{ '--yes-growth': Math.min(attempts, 8) }}
     onPointerMove={event => { pointer.current = { x: event.clientX, y: event.clientY }; }} onPointerLeave={() => { pointer.current = null; }}>
-    <button ref={yes} type="button" className="meeting-action yes" onClick={onYes}><span ref={content} className="meeting-yes-content"><Icon /> Ha</span></button>
+    <button ref={yes} type="button" className="meeting-action yes" onClick={onYes}><span ref={content} className="meeting-yes-content"><Icon kind={friendly ? "friends" : "heart"} /> Ha</span></button>
     <button ref={no} type="button" className="meeting-no" style={position || undefined}
       onPointerEnter={event => { if (event.pointerType === 'mouse') evade(event); }}
       onPointerDown={evade} onClick={event => { if (event.detail === 0) evade(event); else event.preventDefault(); }}
@@ -150,6 +152,8 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
     setReaction({id:++reactionId.current,kind,emoji:choices[Math.floor(Math.random()*choices.length)]});
   }
   const config = invite.details || {};
+  const friendly = config.meeting_kind === 'friendship';
+  const availablePlans = friendly ? plans.filter(plan => ['coffee', 'cinema', 'games'].includes(plan.id)) : plans;
   const recipient = config.meeting_recipient || invite.title;
   const sender = config.meeting_sender || '';
   const key = `qadam:meeting:${tg?.initDataUnsafe?.user?.id || 'receiver'}:${invite.id}:${invite.preview ? 'preview' : 'reply'}`;
@@ -162,7 +166,7 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
       customDate: typeof saved?.customDate === 'string' ? saved.customDate.slice(0, 10) : '',
       customTime: typeof saved?.customTime === 'string' ? saved.customTime.slice(0, 5) : '',
       choice: typeof saved?.choice === 'string' ? saved.choice : '',
-      plan: plans.some(p => p.id === saved?.plan) ? saved.plan : '',
+      plan: availablePlans.some(p => p.id === saved?.plan) ? saved.plan : '',
       note: typeof saved?.note === 'string' ? saved.note.slice(0, 300) : '',
       attempts: Number.isInteger(saved?.attempts) && saved.attempts >= 0 ? Math.min(saved.attempts, 1_000_000) : 0,
     };
@@ -230,27 +234,41 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
     finally { exportBusy.current = false; setExporting(false); }
   }
   const title = text => <h1 ref={heading} tabIndex={-1}>{text}</h1>;
-  return <section className={`invitation design-meeting meeting-flow meeting-${complete ? 'letter' : draft.phase}`}>
-    <MeetingAtmosphere reaction={reaction} />
+  return <section className={`invitation design-meeting meeting-flow ${friendly ? 'meeting-friendly' : ''} meeting-${complete ? 'letter' : draft.phase}`}>
+    {friendly && <div className="friendship-brand"><span>QADAM / DO‘STONA</span><Icon kind="friends" /></div>}
+    {!friendly && <MeetingAtmosphere reaction={reaction} />}
     {invite.preview && <p className="meeting-preview">Ko‘rinishni sinab ko‘rishingiz mumkin. Yakuniy javob yuborilmaydi.</p>}
     {error && <p className="meeting-error" role="alert">{error}</p>}
     {complete ? <>
-      {title(receipt ? 'Biz uchun kichkina xat' : 'Taklif qabul qilingan')}
+      {title(receipt ? (friendly ? 'Kelishdik, do‘stim!' : 'Biz uchun kichkina xat') : 'Taklif qabul qilingan')}
       {receipt ? <>
         <article className="meeting-letter-paper">
-          <Icon className="meeting-letter-heart" />
-          <h2>Aziz {recipient},</h2>
-          <p>Endi hammasi aniq: uchrashuvimiz belgilandi. Bu rejani asrab qo‘yamiz. O‘sha kunni iliqlik bilan kutamiz.</p>
+          <Icon kind={friendly ? "friends" : "heart"} className="meeting-letter-heart" />
+          <h2>{friendly ? "Do‘stim" : "Aziz"} {recipient},</h2>
+          <p>{friendly ? "Reja tayyor! Ishlarni bir chetga qo‘yib, suhbatlashamiz va birga yaxshi vaqt o‘tkazamiz. Ko‘rishguncha!" : "Endi hammasi aniq: uchrashuvimiz belgilandi. Bu rejani asrab qo‘yamiz. O‘sha kunni iliqlik bilan kutamiz."}</p>
           <DateSummary when={receipt.when} />
           <p className="meeting-selected-plan"><Icon kind={plans.find(p => p.id === receipt.plan)?.icon} />{plans.find(p => p.id === receipt.plan)?.label}</p>
           {receipt.note && <p className="meeting-receiver-note">{receipt.note}</p>}
-          <p>Bu uchrashuv biz uchun ajoyib xotiraga aylansin.</p>
-          {sender && <p className="meeting-signature">— {sender} <Icon /></p>}
+          <p>{friendly ? "Yaxshi kunlar yaxshi do‘stlar bilan boshlanadi." : "Bu uchrashuv biz uchun ajoyib xotiraga aylansin."}</p>
+          {sender && <p className="meeting-signature">— {sender} <Icon kind={friendly ? "friends" : "heart"} /></p>}
         </article>
         <button type="button" className="meeting-action" disabled={exporting} onClick={saveCalendar}><Icon kind="download" />{exporting ? 'Tayyorlanmoqda…' : 'Rejani saqlash'}</button>
         <p className="meeting-save-help">Kalendar faylini ochib, telefon kalendariga qo‘shing.</p>
       </> : <p>Bu avvalgi taklifda kun va reja qayd etilmagan.</p>}
     </> : draft.phase === 'intro' ? <>
+      {friendly ? <>
+        <div className="friendship-art" aria-hidden="true">
+          <span className="friendship-orbit orbit-one" /><span className="friendship-orbit orbit-two" />
+          <div className="friendship-bubble bubble-blue"><Icon kind="coffee" /><span>Bir piyola suhbat?</span></div>
+          <div className="friendship-bubble bubble-white"><Icon kind="friends" /><span>Albatta, do‘stim!</span></div>
+          <span className="friendship-spark">✦</span>
+        </div>
+        <p className="friendship-eyebrow">YAXSHI DAVRA. YAXSHI KAYFIYAT.</p>
+        {title(<>{recipient},<br />bir ko‘rishaylik!</>)}
+        <p className="description">Biroz suhbat, ko‘p kulgi va birga o‘tadigan ajoyib vaqt. Siz uchun do‘stona taklif bor.</p>
+        <button type="button" className="meeting-action" onClick={() => phase('question')}>Taklifni ochish <Icon kind="arrow" /></button>
+        <div className="friendship-tags"><span><Icon kind="coffee" /> Suhbat</span><span><Icon kind="game" /> O‘yin</span><span><Icon kind="spark" /> Kayfiyat</span></div>
+      </> : <>
       {title(recipient)}
       <div className="meeting-seal"><JoinedHeart progress={progress} /></div>
       <p className="description">Yurakning ikki bo‘lagini birlashtiring — kichkina savolim sizni kutyapti.</p>
@@ -262,19 +280,20 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
             if (value >= 95) phase('question');
           }} />
       </div>
+      </>}
       {sender && <p className="meeting-from">Kimdan: {sender}</p>}
     </> : draft.phase === 'question' ? <>
       <article className="meeting-question-paper">
-        <p>Sizga munosabatim bor — balki umrning eng yaxshi xotiralaridan biri shunday boshlanar.</p>
+        <p>{friendly ? "Telefonni bir chetga qo‘yib, yuzma-yuz gaplashadigan vaqt keldi." : "Sizga munosabatim bor — balki umrning eng yaxshi xotiralaridan biri shunday boshlanar."}</p>
         {renderMedia?.(invite)}
         {title(<>{recipient},<br />uchrashamizmi?</>)}
         <p className="description">{invite.description}</p>
-        <Choice onYes={() => { react('yes'); phase('celebrate'); }} onNo={no} attempts={draft.attempts} />
+        <Choice onYes={() => { react('yes'); phase('celebrate'); }} onNo={no} attempts={draft.attempts} friendly={friendly} />
       </article>
     </> : draft.phase === 'celebrate' ? <>
-      <div className="meeting-celebrate-heart"><Icon /></div>
+      <div className="meeting-celebrate-heart"><Icon kind={friendly ? "friends" : "heart"} /></div>
       {title(<>Ajoyib,<br />uchrashamiz!</>)}
-      <p>Endi kunni tanlab, bizning kichik rejamizni birga tuzamiz.</p>
+      <p>{friendly ? "Zo‘r! Endi vaqtni kelishib, nima qilishimizni tanlaymiz." : "Endi kunni tanlab, bizning kichik rejamizni birga tuzamiz."}</p>
       <button type="button" className="meeting-action" onClick={() => phase('when')}>Rejani tanlash <Icon kind="calendar" /></button>
     </> : draft.phase === 'when' ? <form onSubmit={nextTime}>
       <div className="meeting-form-top"><button type="button" onClick={() => phase('celebrate')}>Orqaga</button><span>1 / 2</span></div>
@@ -299,7 +318,7 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
       {title('Reja va tilakni tanlang')}
       {validWhen && <DateSummary when={selectedWhen} />}
       <fieldset className="meeting-plan-options"><legend>Nima qilamiz?</legend>
-        {plans.map(plan => <label key={plan.id} className={draft.plan === plan.id ? 'selected' : ''}>
+        {availablePlans.map(plan => <label key={plan.id} className={draft.plan === plan.id ? 'selected' : ''}>
           <input type="radio" name="meeting-plan" value={plan.id} checked={draft.plan === plan.id} disabled={saving} onChange={() => { react(plan.id); patch({ plan: plan.id }); }} />
           <Icon kind={plan.icon} /><span>{plan.label}</span>
         </label>)}

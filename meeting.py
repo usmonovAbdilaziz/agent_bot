@@ -78,7 +78,8 @@ def validate_response(payload, now=None):
 def public_config(item):
     data = json.loads(item['details'])
     # Explicit allowlist; private fields belonging to other designs never leak.
-    return {'meeting_recipient': data.get('meeting_recipient', item['title']),
+    return {'meeting_kind': 'friendship' if data.get('meeting_kind') == 'friendship' else 'love',
+            'meeting_recipient': data.get('meeting_recipient', item['title']),
             'meeting_sender': data.get('meeting_sender', ''),
             'meeting_slots': data.get('meeting_slots', []),
             'meeting_configured': bool(data.get('meeting_configured'))}

@@ -2,6 +2,13 @@ purpose:
   stands_in_for: Telegram Bot API ning rasm, xabar, callback va polling metodlari
   unblocks: Haqiqiy token va foydalanuvchilarsiz Dispatcher, HTTP va SQLite oqimlarini tekshirish
 assumptions:
+  - id: friendship-love-release-20261123
+    status: supported
+    claim: Friendship, love and legacy meeting invitation flows preserve accepted responses and retry sender notifications in the repository-owned Telegram model.
+    reason: The production-based working tree used real Dispatcher callbacks, authenticated HTTP and temporary SQLite. Each scenario injected a sendMessage 500 before successful retry.
+    verification: Three integration tests passed on 2026-11-23; simulation recorded 56 Bot API calls, with 53 HTTP 200 and three injected HTTP 500 responses. Both direction browser suites passed at 280, 390 and 1280px. Live delivery is not established by this simulation.
+    source: tests/test_meeting_postman.py; tests/test_meeting_direct.py; tests/ui_meeting.cjs
+    updated_at: '2026-11-23'
   - id: wedding-shared-preview-20261112
     status: supported
     claim: The wedding wizard uploads a generated PNG preview through sendPhoto, publishes a shared invitation and allows two Telegram users to start it.
