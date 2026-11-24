@@ -7,7 +7,7 @@ const dayValue = date => date.toISOString().slice(0, 10);
 const localDay = value => dayValue(new Date(value + 5 * 3600_000));
 const parseDay = value => new Date(`${value}T12:00:00Z`);
 
-export default function MeetingDateTime({ date, time, onChange }) {
+export default function MeetingDateTime({ date, time, onChange, dateOnly }) {
   const now = Date.now();
   const limit = now + 366 * 86400_000;
   const today = localDay(now);
@@ -74,7 +74,7 @@ export default function MeetingDateTime({ date, time, onChange }) {
       </div>
     </div>
     <p className="meeting-picked-day" role="status">{selectedLabel}</p>
-    <div className="meeting-time-selects">
+    {!dateOnly && <><div className="meeting-time-selects">
       <label>Soat<select aria-label="Soat" value={hour} onChange={event => onChange({ customTime: `${event.target.value}:${minute || '00'}` })} required>
         <option value="" disabled>Tanlang</option>
         {Array.from({ length: 24 }, (_, h) => <option key={h} value={pad(h)} disabled={!Array.from({ length: 60 }, (_, m) => available(h, m)).some(Boolean)}>{pad(h)}</option>)}
@@ -87,5 +87,6 @@ export default function MeetingDateTime({ date, time, onChange }) {
     </div>
     <p className="meeting-picker-help">O‘zbekiston vaqti (UTC+5). Kelgusi bir yil ichidagi vaqtni tanlang.</p>
     {invalid && <p className="meeting-error" role="alert">Bu vaqtni tanlab bo‘lmaydi. Kelajakdagi kun va vaqtni tanlang.</p>}
+    </>}
   </div>;
 }

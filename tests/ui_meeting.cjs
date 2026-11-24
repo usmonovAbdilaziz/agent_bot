@@ -45,25 +45,33 @@ const out=path.join(root,friendly?'output/friendship':'output/meeting');
      status:saved?'accepted':'ready',details:{meeting_kind:friendly?'friendship':'love',meeting_recipient:recipient,meeting_sender:sender,meeting_slots:name==='small'?[]:[when],meeting_configured:true,meeting_response:saved}
     })});
     const file=url.pathname==='/'?'index.html':path.basename(url.pathname);
-    return route.fulfill({contentType:file.endsWith('.mp3')?'audio/mpeg':file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':file.endsWith('.ttf')?'font/ttf':'text/html',body:await fs.readFile(path.join(root,'web_minimal',file))});
+    return route.fulfill({contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':file.endsWith('.ttf')?'font/ttf':'text/html',body:await fs.readFile(path.join(root,'web_minimal',file))});
    });
    const shot=async phase=>{if(name==='mobile'||phase==='letter'||phase==='when'||phase==='question-active')await page.screenshot({path:path.join(out,`${name}-${phase}.png`),fullPage:true,animations:'disabled'});};
    const noOverflow=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    await page.goto('http://meeting.test/?invite=1');
-   const openInvite=async()=>friendly?await page.getByRole('button',{name:'Taklifni ochish'}).click():await page.getByRole('slider').press('End');
-   await (friendly?page.getByRole('button',{name:'Taklifni ochish'}):page.getByRole('slider')).waitFor();
+   const slider=page.getByRole('slider');
+   const openInvite=()=>slider.press('End');
+   await slider.waitFor();
    await noOverflow();await shot('intro');
    if(friendly) {
     assert.equal(await page.locator('.meeting-heart').count(),0);
     assert.equal(await page.locator('.friendship-brand').innerText(),'QADAM / DO‘STONA');
-    assert.equal(await page.locator('h1').evaluate(el=>getComputedStyle(el).color),'rgb(20, 50, 82)');
-    assert.equal(await page.locator('.meeting-action').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(18, 97, 218)');
+    const hands=page.locator('.friendship-hands span');
+    const gap=()=>hands.evaluateAll(([left,right])=>right.offsetLeft-left.offsetLeft);
+    const startGap=await gap();
+    await slider.press('ArrowRight');
+    await slider.press('PageUp');
+    assert.ok(await gap()<startGap);
+
    }
    await openInvite();
+   if(friendly) await page.getByText('🤝',{exact:true}).waitFor();
    await page.getByRole('heading',{name:'Shaxzoda, uchrashamizmi?'}).waitFor();await noOverflow();await shot('question');
    const no=page.getByRole('button',{name:'Yo‘q — qochadigan hazil tugmasi'});
    const initialYes=await page.getByRole('button',{name:'Ha',exact:true}).boundingBox();
    assert.ok(initialYes.height>=72);
+   if (!friendly) {
    const phrases=['Voy, sirpanib ketdim 🫣','Hali ushlamadingiz 😜','Bu tugma sportchi 🏃','Sekinroq, qo‘rqityapsiz 😂','Choyga ham yo‘qmi? ☕','Bir piyola gaplashamiz? 😌','Kalendar ham kutyapti 📅','Men ham uyatchanman 🙈'];
    let previousLabel='Yo‘q';
    const positions=[];
@@ -103,15 +111,63 @@ const out=path.join(root,friendly?'output/friendship':'output/meeting');
    assert.deepEqual(await no.boundingBox(),settled);
    assert.equal(await no.innerText(),settledLabel);
    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('qadam:meeting:2:1:reply')).attempts),10);
+   } else {
+   const positions=[];
+   for(let i=0;i<10;i++){
+    if(i===0&&name==='desktop') {
+     const box=await no.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.move(0,0);
+    } else if(i===0) await no.tap();
+    else {await no.focus();await page.keyboard.press('Enter');}
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('qadam:meeting:2:1:reply')).attempts),i+1,`${name}: attempt ${i+1}`);
+    const geometry=await page.evaluate(()=>{
+     const rect=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height};};
+     return{no:rect('.meeting-no'),yes:rect('.meeting-choices .yes'),label:rect('.meeting-yes-content'),arena:rect('.meeting-choices')};
+    });
+    const {no:chip,yes,label,arena}=geometry;
+    assert.equal(await no.innerText(),'Yo‘q');
+    assert.ok(chip.x>=arena.x&&chip.y>=arena.y&&chip.x+chip.w<=arena.x+arena.w+1&&chip.y+chip.h<=arena.y+arena.h+1);
+    assert.ok(!(chip.x<label.x+label.w&&chip.x+chip.w>label.x&&chip.y<label.y+label.h&&chip.y+chip.h>label.y),'No chip covers Ha label');
+    if(friendly) {
+     const dx=chip.x+chip.w/2-yes.x-yes.w/2, dy=chip.y+chip.h/2-yes.y-yes.h/2;
+     const angle=(i+1)*Math.PI/2;
+     assert.ok(dx*Math.sin(angle)-dy*Math.cos(angle)>40,'Balloon must reach each compass point');
+    } else assert.ok(chip.x<yes.x+yes.w&&chip.x+chip.w>yes.x&&chip.y<yes.y+yes.h&&chip.y+chip.h>yes.y,'No chip must touch Ha border');
+    if(positions.length)assert.ok(Math.hypot(chip.x-positions.at(-1)[0],chip.y-positions.at(-1)[1])>35,'Each attempt must visibly move No');
+    positions.push([Math.round(chip.x),Math.round(chip.y)]);
+   }
+   assert.ok(new Set(positions.map(p=>p.join(','))).size>=3);
+   assert.ok(new Set(positions.map(p=>p[1])).size>1,'No must move vertically around Ha');
+   const grownYes=await page.getByRole('button',{name:'Ha',exact:true}).boundingBox();
+   assert.ok(grownYes.height>initialYes.height&&grownYes.width>=initialYes.width);
+   await page.getByRole('heading',{name:'Shaxzoda, uchrashamizmi?'}).focus();
+   await noOverflow();await shot('question-active');
+   if(name==='mobile') {
+    // Reduced motion pauses idle movement; normal idle relocation never counts a No.
+    const still=await no.boundingBox();await page.waitForTimeout(1900);
+    assert.deepEqual(await no.boundingBox(),still);
+    await page.emulateMedia({reducedMotion:'no-preference'});await page.reload();
+    await page.getByRole('heading',{name:'Shaxzoda, uchrashamizmi?'}).waitFor();
+    await page.waitForTimeout(100);
+    await page.screenshot({path:path.join(out,'mobile-orbit-0.png'),fullPage:true});
+    for(let frame=1;frame<=2;frame++) {
+     const before=await no.boundingBox();
+     await page.waitForFunction(({x,y})=>{const r=document.querySelector('.meeting-no').getBoundingClientRect();return Math.abs(r.x-x)+Math.abs(r.y-y)>2;},before,{timeout:5000});
+     assert.equal(await no.innerText(),'Yo‘q');
+     await page.screenshot({path:path.join(out,`mobile-orbit-${frame}.png`),fullPage:true});
+    }
+    await page.emulateMedia({reducedMotion:'reduce'});
+    assert.equal(posts.length,0);
+   }
+   }
    assert.equal(posts.length,0);
    const yesButton=page.getByRole('button',{name:'Ha',exact:true});
    if(name==='desktop') await yesButton.click();
    else { await yesButton.focus(); await yesButton.press('Enter'); }
    await page.getByRole('heading',{name:'Ajoyib, uchrashamiz!'}).waitFor();assert.equal(posts.length,0);await shot('celebrate');
    await page.getByRole('button',{name:'Rejani tanlash'}).click();
-   await page.getByRole('heading',{name:'Kun va vaqtni tanlang'}).waitFor();
-   assert.equal(await page.getByRole('button',{name:'Keyingi — rejani tanlash'}).isDisabled(),true);
-   if(name!=='small') {
+   await page.getByRole('heading',{name:friendly?'Sanani tanlang':'Kun va vaqtni tanlang'}).waitFor();
+   assert.equal(await page.getByRole('button',{name:friendly?'Keyingi — vaqtni tanlash':'Keyingi — rejani tanlash'}).isDisabled(),true);
+   if(name!=='small' && !friendly) {
     // Sender suggestions continue to work alongside the calendar.
     await page.locator('input[name="meeting-time"]').first().check();
     assert.equal(await page.getByRole('button',{name:'Keyingi — rejani tanlash'}).isDisabled(),false);
@@ -129,8 +185,6 @@ const out=path.join(root,friendly?'output/friendship':'output/meeting');
    await page.waitForFunction(value=>document.activeElement?.dataset.day!==value,day);
    assert.notEqual(await page.locator(':focus').getAttribute('data-day'),day);
    await dateButton.click();
-   await page.getByLabel('Soat',{exact:true}).selectOption('19');
-   await page.getByLabel('Daqiqa',{exact:true}).selectOption('00');
    if(name==='desktop') {
     // Bound navigation at 366 days, including year/month changes.
     const maxDay=new Date(Date.now()+366*86400000+5*3600000).toISOString().slice(0,10);
@@ -142,6 +196,22 @@ const out=path.join(root,friendly?'output/friendship':'output/meeting');
     for(let i=0;i<maxMonths;i++)await page.getByRole('button',{name:'Oldingi oy',exact:true}).click();
    }
    await noOverflow();await shot('when');
+   const selectClock=async()=>{
+    if(friendly) {
+     await page.getByRole('button',{name:'Keyingi — vaqtni tanlash'}).click();
+     const hour=page.getByRole('spinbutton',{name:'Soat'});
+     const minute=page.getByRole('spinbutton',{name:'Daqiqa'});
+     await hour.press('End');
+     for(let i=0;i<4;i++)await hour.press('ArrowUp');
+     await minute.press('Home');
+     assert.equal(await hour.getAttribute('aria-valuenow'),'19');
+     if(name==='mobile')await shot('clock');
+    } else {
+     await page.getByLabel('Soat',{exact:true}).selectOption('19');
+     await page.getByLabel('Daqiqa',{exact:true}).selectOption('00');
+    }
+   };
+   await selectClock();
    await page.getByRole('button',{name:'Keyingi — rejani tanlash'}).click();
    await page.getByRole('heading',{name:'Reja va tilakni tanlang'}).waitFor();
    if(friendly) assert.equal(await page.getByRole('radio',{name:'Ikki kishilik kechki ovqat'}).count(),0);
@@ -191,8 +261,10 @@ const out=path.join(root,friendly?'output/friendship':'output/meeting');
    if(name==='small') {
     for(let i=0;i<monthDelta;i++)await page.getByRole('button',{name:'Keyingi oy',exact:true}).click();
     await page.locator(`[data-day="${day}"]`).click();
-    await page.getByLabel('Soat',{exact:true}).selectOption('19');
-    await page.getByLabel('Daqiqa',{exact:true}).selectOption('00');
+    await selectClock();
+   } else if(friendly) {
+    await page.getByRole('button',{name:/Taklif qilingan/}).first().click();
+    await page.getByRole('button',{name:'Keyingi — vaqtni tanlash'}).click();
    } else await page.locator('input[name="meeting-time"]').first().check();
    await page.getByRole('button',{name:'Keyingi — rejani tanlash'}).click();await page.getByRole('radio',{name:'Qahva va uzoq suhbat'}).check();
    assert.equal(await page.getByRole('button',{name:'Uchrashuvni tasdiqlash'}).isDisabled(),true);assert.equal(posts.length,2);

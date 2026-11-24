@@ -57,3 +57,79 @@ main:has(.meeting-flow.meeting-friendly) #status { color: #234d78; }
 
 main:has(.meeting-flow.meeting-friendly) { max-width: 560px; padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom)); }
 @media(max-width:360px) { main:has(.meeting-flow.meeting-friendly) { padding:16px 12px; } }
+
+.friendship-hands { position: relative; height: 56px; }
+.friendship-hands span { position: absolute; left: 50%; transform: translateX(-50%); font-size: 40px; line-height: 1.3; filter: drop-shadow(0 2px 2px #14325225); }
+.friendship-slider label { color: #143252; }
+.friendship-slider small { display: block; margin-top: 3px; font-weight: 500; color: #486581; }
+.friendship-slider input { background: #edf5ff; touch-action: pan-y; }
+
+.meeting-flow.meeting-friendly .meeting-choices {
+  width: min(calc(100% + 24px), 280px);
+  left: 50%;
+  transform: translateX(-50%);
+  height: auto;
+  aspect-ratio: 1;
+  margin-bottom: 42px;
+}
+.meeting-flow.meeting-friendly .meeting-choices .yes {
+  top: 50%; transform: translate(-50%, -50%); z-index: 1;
+  width: min(40%, calc(76px + var(--yes-growth) * 2px));
+  padding: 4px;
+}
+.meeting-flow.meeting-friendly .meeting-choices .yes:not(:disabled):active { transform: translate(-50%, -50%) scale(.98); }
+.friend-orbit, .friend-orbit-step { position: absolute; inset: 0; pointer-events: none; }
+.friend-orbit { animation: friend-turn 12s linear infinite; }
+.friend-string { position: absolute; left: 50%; top: 23px; bottom: 50%; width: 2px; background: #6492c8; }
+.friend-balloon { position: absolute; top: 2px; left: calc(50% - 23px); width: 46px; height: 46px; animation: friend-turn 12s linear infinite reverse; }
+.friend-upright { width: 100%; height: 100%; }
+.meeting-flow.meeting-friendly .friend-balloon .meeting-no {
+  position: static; width: 100%; height: 100%; min-height: 0; max-width: none; padding: 0;
+  pointer-events: auto; border-radius: 50%; color: #323258;
+  background: radial-gradient(circle at 30% 25%, white, #e3ddfa 45%, #beb2ed);
+}
+.meeting-flow.meeting-friendly .meeting-hint { top: 100%; bottom: auto; }
+@keyframes friend-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .friend-orbit, .friend-balloon { animation: none; }
+}
+.alarm-dial { display:flex; justify-content:center; align-items:center; gap:12px; margin:24px 0; text-align:center; }
+.alarm-dial strong { font-size:13px; color:#486581; }
+.alarm-dial b { padding-top:20px; }
+.alarm-wheel { margin-top:8px; width:clamp(58px,19vw,88px); height:132px; box-sizing:border-box; overflow-y:auto; overscroll-behavior:contain; scroll-snap-type:y mandatory; scrollbar-width:none; padding-block:44px; border-radius:14px; background:linear-gradient(to bottom,#f6f9fc 33.33%,#deebff 33.33% 66.67%,#f6f9fc 66.67%); }
+.alarm-wheel::-webkit-scrollbar { display:none; }
+.alarm-wheel > div { height:44px; line-height:44px; scroll-snap-align:center; font-variant-numeric:tabular-nums; font-size:22px; cursor:pointer; color:#62728a; }
+.alarm-wheel > [data-selected=true] { font-weight:750; color:#123969; }
+
+.friend-ticket {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; position: relative;
+  background: #183d77; color: white; border-radius: 16px; overflow: hidden;
+  margin: 18px 0 26px; text-align: left;
+}
+.friend-ticket > div { display: grid; align-content: center; gap: 7px; padding: 16px; }
+.friend-ticket svg { width: 20px; height: 20px; color: #acceff; }
+.friend-ticket strong { font-size: 16px; line-height: 1.25; }
+.friend-ticket > div + div { position: relative; border-left: 1px dashed #94afe0; background: #204d90; }
+.friend-ticket > div + div::before, .friend-ticket > div + div::after {
+  content: ''; position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: white;
+}
+.friend-ticket > div + div::after { top: auto; bottom: -6px; }
+.friend-ticket > div + div strong { font-size: clamp(22px,6vw,32px); font-variant-numeric: tabular-nums; }
+.friend-ticket small { color: #e3eeff; font-size: 11px; }
+.meeting-friendly.meeting-plan .meeting-plan-options { grid-template-columns: 1fr; }
+.meeting-flow.meeting-friendly .meeting-plan-options label {
+  display: grid; grid-template-columns: 40px minmax(0,1fr) 18px; gap: 12px; align-items: center;
+  padding: 10px 14px; text-align: left; font-size: 14px; font-weight: 600; border-radius: 16px;
+}
+.meeting-flow.meeting-friendly .meeting-plan-options label > svg { box-sizing: border-box; padding: 9px; width: 40px; height: 40px; border-radius: 12px; }
+.meeting-flow.meeting-friendly [data-plan=coffee] > svg { background: #ffebcd; color: #855025; }
+.meeting-flow.meeting-friendly [data-plan=cinema] > svg { background: #eae1ff; color: #60389d; }
+.meeting-flow.meeting-friendly [data-plan=games] > svg { background: #d9f4e8; color: #23634e; }
+.meeting-flow.meeting-friendly .meeting-plan-options label.selected { background: #edf4ff; border-color: #1261da; color: #153d76; }
+.plan-mark { display: grid; place-items: center; width: 18px; height: 18px; border: 1px solid #98aac0; border-radius: 50%; font: bold 13px/1 sans-serif; }
+.selected .plan-mark { color: white; background: #1261da; border-color: #1261da; }
+.meeting-friendly.meeting-plan textarea { background: #f6f9fd; }
+@media (max-width: 340px) {
+  .friend-ticket > div { padding: 12px 9px; }
+  .friend-ticket strong { font-size: 14px; }
+}

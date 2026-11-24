@@ -1,12 +1,13 @@
 import React, { useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
 import plans from './meeting-data.json';
+import AlarmTime, { clockValue, minuteBounds } from './AlarmTime';
 import MeetingDateTime from './MeetingDateTime';
 import MeetingAtmosphere from './MeetingAtmosphere';
 import './meeting.css';
 import './friendship.css';
 
 const tg = window.Telegram?.WebApp;
-const phases = ['intro', 'question', 'celebrate', 'when', 'plan'];
+const phases = ['intro', 'question', 'celebrate', 'when', 'clock', 'plan'];
 const months = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentabr','oktabr','noyabr','dekabr'];
 const weekdays = ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba'];
 function uzDate(value) { return new Date(Date.parse(value) + 5 * 3600_000); }
@@ -63,6 +64,7 @@ function Choice({ onYes, onNo, attempts, friendly }) {
   const hint = ['Yana bir bor o‘ylab ko‘rasizmi?', 'Birga yaxshi vaqt o‘tkazamiz.', 'Ha desangiz, rejani tanlaymiz.'][Math.max(0, attempts - 1) % 3];
 
   useLayoutEffect(() => {
+    if (friendly) return;
     function relocate(randomize = true) {
       const bounds = arena.current.getBoundingClientRect();
       const primary = yes.current.getBoundingClientRect();
@@ -119,7 +121,7 @@ function Choice({ onYes, onNo, attempts, friendly }) {
     });
     observer.observe(arena.current); observer.observe(yes.current); observer.observe(no.current);
     return () => observer.disconnect();
-  }, [attempts]);
+  }, [attempts, friendly]);
 
   function evade(event) {
     event.preventDefault();
@@ -131,18 +133,53 @@ function Choice({ onYes, onNo, attempts, friendly }) {
     onNo();
     tg?.HapticFeedback?.impactOccurred('light');
   }
+  const friendlyButton = <button ref={no} type="button" className="meeting-no" style={position || undefined}
+      onPointerEnter={event => { if (event.pointerType === 'mouse') evade(event); }}
+      onPointerDown={evade} onClick={event => { if (event.detail === 0) evade(event); else event.preventDefault(); }}
+      aria-label="Yo‘q — qochadigan hazil tugmasi" aria-describedby={attempts ? hintId : undefined}>Yo‘q</button>;
   return <div className="meeting-choices" ref={arena} style={{ '--yes-growth': Math.min(attempts, 8) }}
     onPointerMove={event => { pointer.current = { x: event.clientX, y: event.clientY }; }} onPointerLeave={() => { pointer.current = null; }}>
     <button ref={yes} type="button" className="meeting-action yes" onClick={onYes}><span ref={content} className="meeting-yes-content"><Icon kind={friendly ? "friends" : "heart"} /> Ha</span></button>
-    <button ref={no} type="button" className="meeting-no" style={position || undefined}
+    {friendly ? <div className="friend-orbit">
+      <div className="friend-orbit-step" style={{ transform: `rotate(${attempts * 90}deg)` }}>
+        <span className="friend-string" />
+        <div className="friend-balloon"><div className="friend-upright" style={{ transform: `rotate(${-attempts * 90}deg)` }}>{friendlyButton}</div></div>
+      </div>
+    </div> : <button ref={no} type="button" className="meeting-no" style={position || undefined}
       onClick={evade}
-      aria-label="Yo‘q — qochadigan hazil tugmasi" aria-describedby={attempts ? hintId : undefined}>{noLabel}</button>
+      aria-label="Yo‘q — qochadigan hazil tugmasi" aria-describedby={attempts ? hintId : undefined}>{noLabel}</button>}
+
     {attempts > 0 && <p id={hintId} className="meeting-hint" role="status">{hint}</p>}
   </div>;
 }
 
 function DateSummary({ when }) {
   return <div className="meeting-date-summary"><Icon kind="calendar" /><span>{dateLabel(when)}<small>{timeLabel(when)} · O‘zbekiston vaqti</small></span></div>;
+}
+
+function FriendshipSlider({ onOpen }) {
+  const [position, setPosition] = useState(0);
+  const timer = useRef(null);
+  const id = useId();
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  function slide(event) {
+    if (timer.current !== null) return;
+    const value = Number(event.target.value);
+    setPosition(value);
+    if (value === 100) timer.current = setTimeout(onOpen, 650);
+  }
+
+  return <div className="meeting-slider friendship-slider">
+    <div className="friendship-hands" aria-hidden="true">
+      {position === 100 ? <span>🤝</span> : <>
+        <span style={{ left: `${12 + position * .32}%` }}>🫱</span>
+        <span style={{ left: `${88 - position * .32}%` }}>🫲</span>
+      </>}
+    </div>
+    <label htmlFor={id}>Taklifnoma <small>Ochish uchun o‘ngga suring →</small></label>
+    <input id={id} type="range" min="0" max="100" value={position} onChange={slide} />
+  </div>;
 }
 
 export default function Meeting({ invite, api, onStatus, renderMedia }) {
@@ -267,7 +304,7 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
         <p className="friendship-eyebrow">YAXSHI DAVRA. YAXSHI KAYFIYAT.</p>
         {title(<>{recipient},<br />bir ko‘rishaylik!</>)}
         <p className="description">Biroz suhbat, ko‘p kulgi va birga o‘tadigan ajoyib vaqt. Siz uchun do‘stona taklif bor.</p>
-        <button type="button" className="meeting-action" onClick={() => phase('question')}>Taklifni ochish <Icon kind="arrow" /></button>
+        <FriendshipSlider onOpen={() => phase('question')} />
         <div className="friendship-tags"><span><Icon kind="coffee" /> Suhbat</span><span><Icon kind="game" /> O‘yin</span><span><Icon kind="spark" /> Kayfiyat</span></div>
       </> : <>
       {title(recipient)}
@@ -296,7 +333,29 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
       {title(<>Ajoyib,<br />uchrashamiz!</>)}
       <p>{friendly ? "Zo‘r! Endi vaqtni kelishib, nima qilishimizni tanlaymiz." : "Endi kunni tanlab, bizning kichik rejamizni birga tuzamiz."}</p>
       <button type="button" className="meeting-action" onClick={() => phase('when')}>Rejani tanlash <Icon kind="calendar" /></button>
-    </> : draft.phase === 'when' ? <form onSubmit={nextTime}>
+    </> : friendly && draft.phase === 'when' ? <form onSubmit={event => {
+      event.preventDefault();
+      const [low, high] = minuteBounds(draft.customDate);
+      if (!(low <= high)) return;
+      const [hour, minute] = draft.customTime.split(':').map(Number);
+      const initial = Number.isFinite(minute) ? hour*60+minute : 12*60;
+      patch({ phase: 'clock', choice: 'custom', customTime: clockValue(Math.min(high, Math.max(low, initial))) });
+    }}>
+      <div className="meeting-form-top"><button type="button" onClick={() => phase('celebrate')}>Orqaga</button><span>1 / 3</span></div>
+      {title('Sanani tanlang')}
+      {slots.map(slot => <button type="button" className="meeting-time-option" key={slot} onClick={() => {
+        const local = new Date(Date.parse(slot)+5*3600000).toISOString();
+        patch({customDate: local.slice(0,10), customTime: local.slice(11,16), choice: 'custom'});
+      }}>Taklif qilingan: {dateLabel(slot)} · {timeLabel(slot)}</button>)}
+      <MeetingDateTime key={draft.customDate} dateOnly date={draft.customDate} time={draft.customTime} onChange={patch} />
+      <button className="meeting-action" disabled={!(minuteBounds(draft.customDate)[0] <= minuteBounds(draft.customDate)[1])}>Keyingi — vaqtni tanlash</button>
+    </form> : friendly && draft.phase === 'clock' ? <form onSubmit={nextTime}>
+      <div className="meeting-form-top"><button type="button" onClick={() => phase('when')}>Sanaga qaytish</button><span>2 / 3</span></div>
+      {title('Vaqtni tanlang')}
+      <p>{dateLabel(customWhen)} · O‘zbekiston vaqti (UTC+5)</p>
+      <AlarmTime date={draft.customDate} time={draft.customTime} onChange={customTime => patch({customTime})} />
+      <button className="meeting-action" disabled={!validWhen}>Keyingi — rejani tanlash</button>
+    </form> : draft.phase === 'when' ? <form onSubmit={nextTime}>
       <div className="meeting-form-top"><button type="button" onClick={() => phase('celebrate')}>Orqaga</button><span>1 / 2</span></div>
       {title('Kun va vaqtni tanlang')}
       <fieldset><legend>Qachon uchrashamiz?</legend>
@@ -315,13 +374,17 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
       </fieldset>
       <button className="meeting-action" type="submit" disabled={!validWhen}>Keyingi — rejani tanlash <Icon kind="arrow" /></button>
     </form> : <form onSubmit={confirm}>
-      <div className="meeting-form-top"><button type="button" disabled={saving} onClick={() => phase('when')}>Vaqtga qaytish</button><span>2 / 2</span></div>
+      <div className="meeting-form-top"><button type="button" disabled={saving} onClick={() => phase(friendly && customChoice ? 'clock' : 'when')}>Vaqtga qaytish</button><span>{friendly ? '3 / 3' : '2 / 2'}</span></div>
       {title('Reja va tilakni tanlang')}
-      {validWhen && <DateSummary when={selectedWhen} />}
+      {validWhen && (friendly ? <div className="friend-ticket">
+        <div><Icon kind="calendar" /><strong>{dateLabel(selectedWhen)}</strong></div>
+        <div><strong>{timeLabel(selectedWhen)}</strong><small>O‘zbekiston vaqti</small></div>
+      </div> : <DateSummary when={selectedWhen} />)}
       <fieldset className="meeting-plan-options"><legend>Nima qilamiz?</legend>
-        {availablePlans.map(plan => <label key={plan.id} className={draft.plan === plan.id ? 'selected' : ''}>
+        {availablePlans.map(plan => <label key={plan.id} data-plan={plan.id} className={draft.plan === plan.id ? 'selected' : ''}>
           <input type="radio" name="meeting-plan" value={plan.id} checked={draft.plan === plan.id} disabled={saving} onChange={() => { react(plan.id); patch({ plan: plan.id }); }} />
           <Icon kind={plan.icon} /><span>{plan.label}</span>
+          {friendly && <i className="plan-mark" aria-hidden="true">{draft.plan === plan.id ? '✓' : ''}</i>}
         </label>)}
       </fieldset>
       <label className="meeting-note-label" htmlFor={`note-${invite.id}`}>Sizdan bir-ikki og‘iz — ixtiyoriy</label>
