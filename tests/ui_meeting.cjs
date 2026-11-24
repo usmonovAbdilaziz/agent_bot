@@ -69,9 +69,9 @@ const out=path.join(root,friendly?'output/friendship':'output/meeting');
    if(friendly) await page.getByText('🤝',{exact:true}).waitFor();
    await page.getByRole('heading',{name:'Shaxzoda, uchrashamizmi?'}).waitFor();await noOverflow();await shot('question');
    const no=page.getByRole('button',{name:'Yo‘q — qochadigan hazil tugmasi'});
+   if (!friendly) {
    const initialYes=await page.getByRole('button',{name:'Ha',exact:true}).boundingBox();
    assert.ok(initialYes.height>=72);
-   if (!friendly) {
    const phrases=['Voy, sirpanib ketdim 🫣','Hali ushlamadingiz 😜','Bu tugma sportchi 🏃','Sekinroq, qo‘rqityapsiz 😂','Choyga ham yo‘qmi? ☕','Bir piyola gaplashamiz? 😌','Kalendar ham kutyapti 📅','Men ham uyatchanman 🙈'];
    let previousLabel='Yo‘q';
    const positions=[];
@@ -112,52 +112,13 @@ const out=path.join(root,friendly?'output/friendship':'output/meeting');
    assert.equal(await no.innerText(),settledLabel);
    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('qadam:meeting:2:1:reply')).attempts),10);
    } else {
-   const positions=[];
-   for(let i=0;i<10;i++){
-    if(i===0&&name==='desktop') {
-     const box=await no.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.move(0,0);
-    } else if(i===0) await no.tap();
-    else {await no.focus();await page.keyboard.press('Enter');}
-    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('qadam:meeting:2:1:reply')).attempts),i+1,`${name}: attempt ${i+1}`);
-    const geometry=await page.evaluate(()=>{
-     const rect=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height};};
-     return{no:rect('.meeting-no'),yes:rect('.meeting-choices .yes'),label:rect('.meeting-yes-content'),arena:rect('.meeting-choices')};
-    });
-    const {no:chip,yes,label,arena}=geometry;
-    assert.equal(await no.innerText(),'Yo‘q');
-    assert.ok(chip.x>=arena.x&&chip.y>=arena.y&&chip.x+chip.w<=arena.x+arena.w+1&&chip.y+chip.h<=arena.y+arena.h+1);
-    assert.ok(!(chip.x<label.x+label.w&&chip.x+chip.w>label.x&&chip.y<label.y+label.h&&chip.y+chip.h>label.y),'No chip covers Ha label');
-    if(friendly) {
-     const dx=chip.x+chip.w/2-yes.x-yes.w/2, dy=chip.y+chip.h/2-yes.y-yes.h/2;
-     const angle=(i+1)*Math.PI/2;
-     assert.ok(dx*Math.sin(angle)-dy*Math.cos(angle)>40,'Balloon must reach each compass point');
-    } else assert.ok(chip.x<yes.x+yes.w&&chip.x+chip.w>yes.x&&chip.y<yes.y+yes.h&&chip.y+chip.h>yes.y,'No chip must touch Ha border');
-    if(positions.length)assert.ok(Math.hypot(chip.x-positions.at(-1)[0],chip.y-positions.at(-1)[1])>35,'Each attempt must visibly move No');
-    positions.push([Math.round(chip.x),Math.round(chip.y)]);
-   }
-   assert.ok(new Set(positions.map(p=>p.join(','))).size>=3);
-   assert.ok(new Set(positions.map(p=>p[1])).size>1,'No must move vertically around Ha');
-   const grownYes=await page.getByRole('button',{name:'Ha',exact:true}).boundingBox();
-   assert.ok(grownYes.height>initialYes.height&&grownYes.width>=initialYes.width);
-   await page.getByRole('heading',{name:'Shaxzoda, uchrashamizmi?'}).focus();
-   await noOverflow();await shot('question-active');
-   if(name==='mobile') {
-    // Reduced motion pauses idle movement; normal idle relocation never counts a No.
-    const still=await no.boundingBox();await page.waitForTimeout(1900);
-    assert.deepEqual(await no.boundingBox(),still);
-    await page.emulateMedia({reducedMotion:'no-preference'});await page.reload();
-    await page.getByRole('heading',{name:'Shaxzoda, uchrashamizmi?'}).waitFor();
-    await page.waitForTimeout(100);
-    await page.screenshot({path:path.join(out,'mobile-orbit-0.png'),fullPage:true});
-    for(let frame=1;frame<=2;frame++) {
-     const before=await no.boundingBox();
-     await page.waitForFunction(({x,y})=>{const r=document.querySelector('.meeting-no').getBoundingClientRect();return Math.abs(r.x-x)+Math.abs(r.y-y)>2;},before,{timeout:5000});
-     assert.equal(await no.innerText(),'Yo‘q');
-     await page.screenshot({path:path.join(out,`mobile-orbit-${frame}.png`),fullPage:true});
-    }
-    await page.emulateMedia({reducedMotion:'reduce'});
-    assert.equal(posts.length,0);
-   }
+    const first=await no.innerText();
+    const initial=await no.boundingBox();
+    await page.waitForFunction(first=>document.querySelector('.friend-caption').textContent!==first,first);
+    assert.notDeepEqual(await no.boundingBox(),initial);
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('qadam:meeting:2:1:reply')).attempts),0);
+    for(let i=0;i<10;i++) await no.press('Enter');
+    await noOverflow(); await shot('question-active');
    }
    assert.equal(posts.length,0);
    const yesButton=page.getByRole('button',{name:'Ha',exact:true});

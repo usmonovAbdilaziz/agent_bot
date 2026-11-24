@@ -64,35 +64,6 @@ main:has(.meeting-flow.meeting-friendly) { max-width: 560px; padding: max(24px, 
 .friendship-slider small { display: block; margin-top: 3px; font-weight: 500; color: #486581; }
 .friendship-slider input { background: #edf5ff; touch-action: pan-y; }
 
-.meeting-flow.meeting-friendly .meeting-choices {
-  width: min(calc(100% + 24px), 280px);
-  left: 50%;
-  transform: translateX(-50%);
-  height: auto;
-  aspect-ratio: 1;
-  margin-bottom: 42px;
-}
-.meeting-flow.meeting-friendly .meeting-choices .yes {
-  top: 50%; transform: translate(-50%, -50%); z-index: 1;
-  width: min(40%, calc(76px + var(--yes-growth) * 2px));
-  padding: 4px;
-}
-.meeting-flow.meeting-friendly .meeting-choices .yes:not(:disabled):active { transform: translate(-50%, -50%) scale(.98); }
-.friend-orbit, .friend-orbit-step { position: absolute; inset: 0; pointer-events: none; }
-.friend-orbit { animation: friend-turn 12s linear infinite; }
-.friend-string { position: absolute; left: 50%; top: 23px; bottom: 50%; width: 2px; background: #6492c8; }
-.friend-balloon { position: absolute; top: 2px; left: calc(50% - 23px); width: 46px; height: 46px; animation: friend-turn 12s linear infinite reverse; }
-.friend-upright { width: 100%; height: 100%; }
-.meeting-flow.meeting-friendly .friend-balloon .meeting-no {
-  position: static; width: 100%; height: 100%; min-height: 0; max-width: none; padding: 0;
-  pointer-events: auto; border-radius: 50%; color: #323258;
-  background: radial-gradient(circle at 30% 25%, white, #e3ddfa 45%, #beb2ed);
-}
-.meeting-flow.meeting-friendly .meeting-hint { top: 100%; bottom: auto; }
-@keyframes friend-turn { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) {
-  .friend-orbit, .friend-balloon { animation: none; }
-}
 .alarm-dial { display:flex; justify-content:center; align-items:center; gap:12px; margin:24px 0; text-align:center; }
 .alarm-dial strong { font-size:13px; color:#486581; }
 .alarm-dial b { padding-top:20px; }
@@ -133,3 +104,12 @@ main:has(.meeting-flow.meeting-friendly) { max-width: 560px; padding: max(24px, 
   .friend-ticket > div { padding: 12px 9px; }
   .friend-ticket strong { font-size: 14px; }
 }
+
+.friend-choice { position:relative; width:100%; max-width:364px; margin:18px auto 0; height:178px; }
+.friend-choice .friend-thread { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.friend-thread line { stroke:#65768c; stroke-width:1.5; }
+.meeting-friendly .friend-choice .friend-yes, .friend-choice .friend-caption {
+  position:absolute; transform:translate(-50%,-50%); margin:0;
+}
+.meeting-friendly .friend-choice .friend-yes { top:50%; left:50%; width:60%; min-height:48px; padding:8px; border-radius:999px; }
+.friend-choice .friend-caption { width:min(46%,120px); min-height:40px; padding:5px 8px; border:1px solid #d3dae2; border-radius:18px; background:#edf0f4; color:#32425a; font-size:12px; line-height:1.2; cursor:pointer; }

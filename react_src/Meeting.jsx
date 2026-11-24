@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
 import plans from './meeting-data.json';
 import AlarmTime, { clockValue, minuteBounds } from './AlarmTime';
+import FriendChoice from './FriendChoice';
 import MeetingDateTime from './MeetingDateTime';
 import MeetingAtmosphere from './MeetingAtmosphere';
 import './meeting.css';
@@ -51,7 +52,7 @@ const noMessages = [
   'Sekinroq, qo‘rqityapsiz 😂', 'Choyga ham yo‘qmi? ☕', 'Bir piyola gaplashamiz? 😌',
   'Kalendar ham kutyapti 📅', 'Men ham uyatchanman 🙈',
 ];
-function Choice({ onYes, onNo, attempts, friendly }) {
+function Choice({ onYes, onNo, attempts }) {
   const [noLabel, setNoLabel] = useState('Yo‘q');
   const [position, setPosition] = useState(null);
   const arena = useRef(null);
@@ -64,7 +65,6 @@ function Choice({ onYes, onNo, attempts, friendly }) {
   const hint = ['Yana bir bor o‘ylab ko‘rasizmi?', 'Birga yaxshi vaqt o‘tkazamiz.', 'Ha desangiz, rejani tanlaymiz.'][Math.max(0, attempts - 1) % 3];
 
   useLayoutEffect(() => {
-    if (friendly) return;
     function relocate(randomize = true) {
       const bounds = arena.current.getBoundingClientRect();
       const primary = yes.current.getBoundingClientRect();
@@ -121,7 +121,7 @@ function Choice({ onYes, onNo, attempts, friendly }) {
     });
     observer.observe(arena.current); observer.observe(yes.current); observer.observe(no.current);
     return () => observer.disconnect();
-  }, [attempts, friendly]);
+  }, [attempts]);
 
   function evade(event) {
     event.preventDefault();
@@ -133,22 +133,12 @@ function Choice({ onYes, onNo, attempts, friendly }) {
     onNo();
     tg?.HapticFeedback?.impactOccurred('light');
   }
-  const friendlyButton = <button ref={no} type="button" className="meeting-no" style={position || undefined}
-      onPointerEnter={event => { if (event.pointerType === 'mouse') evade(event); }}
-      onPointerDown={evade} onClick={event => { if (event.detail === 0) evade(event); else event.preventDefault(); }}
-      aria-label="Yo‘q — qochadigan hazil tugmasi" aria-describedby={attempts ? hintId : undefined}>Yo‘q</button>;
   return <div className="meeting-choices" ref={arena} style={{ '--yes-growth': Math.min(attempts, 8) }}
     onPointerMove={event => { pointer.current = { x: event.clientX, y: event.clientY }; }} onPointerLeave={() => { pointer.current = null; }}>
-    <button ref={yes} type="button" className="meeting-action yes" onClick={onYes}><span ref={content} className="meeting-yes-content"><Icon kind={friendly ? "friends" : "heart"} /> Ha</span></button>
-    {friendly ? <div className="friend-orbit">
-      <div className="friend-orbit-step" style={{ transform: `rotate(${attempts * 90}deg)` }}>
-        <span className="friend-string" />
-        <div className="friend-balloon"><div className="friend-upright" style={{ transform: `rotate(${-attempts * 90}deg)` }}>{friendlyButton}</div></div>
-      </div>
-    </div> : <button ref={no} type="button" className="meeting-no" style={position || undefined}
+    <button ref={yes} type="button" className="meeting-action yes" onClick={onYes}><span ref={content} className="meeting-yes-content"><Icon kind="heart" /> Ha</span></button>
+    <button ref={no} type="button" className="meeting-no" style={position || undefined}
       onClick={evade}
-      aria-label="Yo‘q — qochadigan hazil tugmasi" aria-describedby={attempts ? hintId : undefined}>{noLabel}</button>}
-
+      aria-label="Yo‘q — qochadigan hazil tugmasi" aria-describedby={attempts ? hintId : undefined}>{noLabel}</button>
     {attempts > 0 && <p id={hintId} className="meeting-hint" role="status">{hint}</p>}
   </div>;
 }
@@ -326,7 +316,7 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
         {renderMedia?.(invite)}
         {title(<>{recipient},<br />uchrashamizmi?</>)}
         <p className="description">{invite.description}</p>
-        <Choice onYes={() => { react('yes'); phase('celebrate'); }} onNo={no} attempts={draft.attempts} friendly={friendly} />
+        {friendly ? <FriendChoice onYes={() => phase('celebrate')} onNo={no} /> : <Choice onYes={() => { react('yes'); phase('celebrate'); }} onNo={no} attempts={draft.attempts} />}
       </article>
     </> : draft.phase === 'celebrate' ? <>
       <div className="meeting-celebrate-heart"><Icon kind={friendly ? "friends" : "heart"} /></div>
