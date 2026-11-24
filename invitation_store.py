@@ -24,6 +24,7 @@ CREATE INDEX IF NOT EXISTS q_meeting_reminders_due ON q_meeting_reminders(status
 CREATE TABLE IF NOT EXISTS q_meeting_responses(
  invite_id INTEGER PRIMARY KEY, when_value TEXT NOT NULL,
  plan TEXT NOT NULL, note TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS q_daily_activity(day TEXT NOT NULL, uid INTEGER NOT NULL, PRIMARY KEY(day,uid));
 CREATE TABLE IF NOT EXISTS q_profiles(uid INTEGER PRIMARY KEY, full_name TEXT NOT NULL, phone_hash TEXT UNIQUE);
 CREATE TABLE IF NOT EXISTS q_senders(uid INTEGER PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS q_sender_credits(uid INTEGER PRIMARY KEY, remaining INTEGER NOT NULL CHECK(remaining >= 0));
@@ -137,6 +138,10 @@ class InvitationDB(DB):
         async with self.connect() as c:
             await c.executescript(SCHEMA)
             columns = {r[1] for r in await (await c.execute('PRAGMA table_info(q_invites)')).fetchall()}
+            if 'published_at' not in columns:
+                await c.execute('ALTER TABLE q_invites ADD COLUMN published_at REAL')
+            await c.execute('CREATE INDEX IF NOT EXISTS q_publish_time ON q_invites(published_at)')
+            await c.execute('CREATE INDEX IF NOT EXISTS q_report_sender ON q_invites(sender) WHERE token IS NOT NULL')
             if 'link_sent' not in columns:
                 await c.execute('ALTER TABLE q_invites ADD COLUMN link_sent INTEGER NOT NULL DEFAULT 0')
             if 'no_attempts' not in columns:
@@ -151,6 +156,7 @@ class InvitationDB(DB):
                 await c.execute("ALTER TABLE q_invites ADD COLUMN share_mode TEXT NOT NULL DEFAULT 'single' CHECK(share_mode IN ('single','open'))")
             # executescript commits implicitly, so begin only after schema bootstrap.
             await c.execute('BEGIN IMMEDIATE')
+            await c.execute("INSERT OR IGNORE INTO settings(key,value) VALUES('report_since',strftime('%Y-%m-%d %H:%M','now','+5 hours'))")
             try:
                 await self._migrate_rsvps(c)
                 await c.commit()
@@ -272,6 +278,7 @@ class InvitationDB(DB):
 
     async def profile(self, user):
         await self.register(user, activate=True)
+        await self.run("INSERT OR IGNORE INTO q_daily_activity(day,uid) VALUES(date('now','+5 hours'),?)", (user.id,))
         name = ' '.join(filter(None, [user.first_name, getattr(user, 'last_name', None)]))
         await self.run('''INSERT INTO q_profiles(uid,full_name) VALUES(?,?)
           ON CONFLICT(uid) DO UPDATE SET full_name=excluded.full_name''', (user.id,name))
@@ -331,7 +338,7 @@ class InvitationDB(DB):
                 if not await self._can_publish(c,uid): return None
                 expiry = expires_at(wedding) if wedding else ceremony_expiry(parse_details(row['details'])) if row['type']=='ceremony' else time.time()+ttl
                 if expiry <= time.time(): return None
-                await c.execute("UPDATE q_invites SET status='ready',token=?,expires_at=? WHERE id=?",(secrets.token_urlsafe(18),expiry,mid))
+                await c.execute("UPDATE q_invites SET status='ready',token=?,expires_at=?,published_at=? WHERE id=?",(secrets.token_urlsafe(18),expiry,time.time(),mid))
                 admin = await (await c.execute("SELECT value FROM settings WHERE key='admin'")).fetchone()
                 if not admin or admin[0]!=str(uid):
                     credit = await (await c.execute('SELECT remaining FROM q_sender_credits WHERE uid=?',(uid,))).fetchone()

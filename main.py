@@ -10,7 +10,7 @@ import os
 import re
 import time
 from urllib.parse import urlencode
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot, Dispatcher, F
@@ -217,7 +217,60 @@ class App:
         await self.send(uid,'<b>Admin</b>',reply_markup=kb(
             [('O‘zim','q:choose'),('Boshqa raqam','q:phone')],
             [('Sender so‘rovlari','q:requests'),('Takliflar','q:ideas')],
-            [('Orqaga','q:home')]))
+            [('⚙️ Settings','q:settings')], [('Orqaga','q:home')]))
+
+    async def settings_report(self, uid):
+        if uid != await self.admin():
+            return await self.home(uid)
+        today = datetime.now(ZoneInfo('Asia/Tashkent')).date()
+        first = today - timedelta(days=6)
+        start = datetime.combine(first, datetime.min.time(), ZoneInfo('Asia/Tashkent')).timestamp()
+        totals = await self.db.one("""SELECT (SELECT count(*) FROM q_profiles) AS users,
+            count(DISTINCT sender) AS creators, count(*) AS invites FROM q_invites WHERE token IS NOT NULL""")
+        active = await self.db.all("""SELECT day, count(*) AS n FROM q_daily_activity
+            WHERE day >= ? GROUP BY day""", (first.isoformat(),))
+        daily = await self.db.all("""SELECT date(published_at,'unixepoch','+5 hours') AS day,
+            count(DISTINCT sender) AS creators, count(*) AS invites FROM q_invites
+            WHERE published_at >= ? GROUP BY day""", (start,))
+        activity = {row['day']: row['n'] for row in active}
+        published = {row['day']: row for row in daily}
+        since = await self.db.setting('report_since')
+        lines = ['<b>Settings · Bot hisoboti</b>', '',
+                 f'Jami foydalanuvchilar: <b>{totals["users"]}</b>',
+                 f'Taklifnoma yaratganlar: <b>{totals["creators"]}</b>',
+                 f'Tayyor taklifnomalar: <b>{totals["invites"]}</b>', '',
+                 '<b>Kunlik hisobot · O‘zbekiston vaqti</b>',
+                 'Sana · Faol odamlar / Yaratuvchilar / Taklifnomalar']
+        for offset in range(7):
+            day = today - timedelta(days=offset)
+            key = day.isoformat()
+            if key < since[:10]:
+                break
+            row = published.get(key)
+            lines.append(f'{day:%d.%m} · {activity.get(key,0)} / {row["creators"] if row else 0} / {row["invites"] if row else 0}')
+        lines.extend(['', f'Kunlik hisob boshlangan vaqt: {esc(since)}.',
+                      'Faol odam — botga xabar yuborgan yoki menyu tugmasini bosgan foydalanuvchi. Taklifnoma tasdiqlanganda hisoblanadi.'])
+        return await self.send(uid, '\n'.join(lines), reply_markup=kb(
+            [('Foydalanuvchilar','q:reportusers:0')], [('Yangilash','q:settings'),('Orqaga','q:admin')]))
+
+    async def report_users(self, uid, page):
+        if uid != await self.admin():
+            return await self.home(uid)
+        rows = await self.db.all("""SELECT p.full_name, u.username, u.tg_id,
+            (SELECT count(*) FROM q_invites i WHERE i.sender=p.uid AND i.token IS NOT NULL) AS invites
+            FROM users u JOIN q_profiles p ON p.uid=u.tg_id
+            ORDER BY u.created_at DESC, u.tg_id DESC LIMIT 11 OFFSET ?""", (page*10,))
+        lines = ['<b>Foydalanuvchilar</b>', 'Oxirgi qo‘shilganlar birinchi.', '']
+        for row in rows[:10]:
+            handle = ' @' + esc(row['username']) if row['username'] else ''
+            lines.append(f'{esc(row["full_name"][:80])}{handle} · {row["invites"]} ta taklifnoma')
+        nav = []
+        if page:
+            nav.append(('Oldingi', f'q:reportusers:{page-1}'))
+        if len(rows)>10:
+            nav.append(('Keyingi', f'q:reportusers:{page+1}'))
+        return await self.send(uid, '\n'.join(lines), reply_markup=kb(
+            *([nav] if nav else []), [('Orqaga','q:settings')]))
 
     async def invite_list(self, uid, page=0):
         rows=await self.db.all('SELECT id,title,status,type FROM q_invites WHERE sender=? AND status!=\'draft\' ORDER BY id DESC LIMIT 10 OFFSET ?', (uid,page*10))
@@ -749,6 +802,9 @@ class App:
             await self.db.run("DELETE FROM q_flows WHERE uid=? AND stage='phone'",(uid,))
             return await self.home(uid)
         if action=='help': return await self.send(uid,'Taklif yaratish: “Taklif yaratish”ni bosing.\nRasm ixtiyoriy.\nIsmni qoldiring yoki o‘zgartiring.\nMatnni yozib, tasdiqlang.',reply_markup=kb([('Orqaga','q:home')]))
+        if action=='settings': return await self.settings_report(uid)
+        if action=='reportusers' and len(parts)==3 and parts[2].isascii() and parts[2].isdigit() and len(parts[2])<=8:
+            return await self.report_users(uid,int(parts[2]))
         if action=='admin': return await self.admin_menu(uid)
         if action=='continue':
             flow=await self.db.flow(uid)
