@@ -12,6 +12,7 @@ async def wedding_draft(n, uid=1):
     assert 'Taklif turini tanlang' in n.sent(uid)[-1]['text']
     await n.cb(uid,'q:ceremony')
     assert 'Marosim turini tanlang' in n.sent(uid)[-1]['text']
+    assert 'q:banquet' not in n.sent(uid)[-1]['reply_markup']
     await n.cb(uid,'q:banquet')
     assert 'keyingi bosqichda' in n.sent(uid)[-1]['text']
     assert not await n.db.flow(uid)

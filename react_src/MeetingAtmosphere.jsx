@@ -3,13 +3,11 @@ import musicUrl from './assets/meeting-love-you.mp3';
 
 export default function MeetingAtmosphere({ reaction }) {
   const audio = useRef(null);
-  const enabled = useRef(true);
+  const enabled = useRef(false);
   const start = useRef(() => {});
   const stop = useRef(() => {});
   const sound = useRef(null);
-  const [on, setOn] = useState(() => {
-    try { return localStorage.getItem('qadam:music') !== 'off'; } catch { return true; }
-  });
+  const [on, setOn] = useState(false);
   const [playing, setPlaying] = useState(false);
   enabled.current = on;
 
@@ -26,6 +24,7 @@ export default function MeetingAtmosphere({ reaction }) {
       pending = true; restart = false;
       player.volume = 0;
       try {
+        if (!player.hasAttribute('src')) player.src = musicUrl;
         await player.play();
         if (disposed || !enabled.current || document.hidden) { pause(); return; }
         setPlaying(true);
@@ -48,7 +47,6 @@ export default function MeetingAtmosphere({ reaction }) {
     }
     function visibility() { if (document.hidden) pause(); else play(); }
     start.current = play; stop.current = pause;
-    play();
     document.addEventListener('pointerdown', gesture, true);
     document.addEventListener('keydown', gesture, true);
     document.addEventListener('visibilitychange', visibility);
@@ -86,11 +84,10 @@ export default function MeetingAtmosphere({ reaction }) {
   function toggle() {
     const next = !on || !playing;
     enabled.current = next; setOn(next);
-    try { localStorage.setItem('qadam:music',next ? 'on' : 'off'); } catch { /* optional storage */ }
     if (next) start.current(); else stop.current();
   }
   return <div className="meeting-atmosphere">
-    <audio ref={audio} src={musicUrl} loop preload="auto" playsInline onPause={() => setPlaying(false)} onPlaying={() => setPlaying(true)} />
+    <audio ref={audio} loop preload="none" playsInline onPause={() => setPlaying(false)} onPlaying={() => setPlaying(true)} />
     <div className="meeting-sticker-stage" aria-hidden="true">
       {reaction && <div key={reaction.id} className={`meeting-sticker reaction-${reaction.kind}`}>
         <span className="sticker-balloon">{reaction.emoji}</span>

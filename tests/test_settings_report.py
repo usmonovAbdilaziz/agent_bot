@@ -14,7 +14,9 @@ async def test_admin_report_counts_people_and_published_invitations(n):
     assert 'Jami foydalanuvchilar: <b>2</b>' in text
     assert 'Taklifnoma yaratganlar: <b>1</b>' in text
     assert 'Tayyor taklifnomalar: <b>2</b>' in text
-    assert ' · 2 / 1 / 2' in text
+    assert 'Faol — 2 kishi' in text
+    assert 'Yaratuvchi — 1 kishi' in text
+    assert 'Tayyor taklif — 2 ta' in text
     await n.cb(1, 'q:reportusers:0')
     assert '2 ta taklifnoma' in n.sent(1)[-1]['text']
     for action in ('q:settings', 'q:reportusers:0'):

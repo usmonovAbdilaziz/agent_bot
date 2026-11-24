@@ -14,14 +14,18 @@ const image = execFileSync('python3', ['-c', "import sys; from wedding import re
       page.on('pageerror', e => errors.push(e.message));
       await page.addInitScript(() => { window.Telegram = { WebApp: { initData: 'fixture', ready(){}, expand(){} } }; });
       await page.route('https://telegram.org/**', route => route.fulfill({ contentType: 'application/javascript', body: '' }));
+      let imageRequests=0;
       await page.route('http://qadam.test/**', async route => {
         const url = new URL(route.request().url());
+        if (url.pathname.endsWith('/wedding-image') && ++imageRequests === 1) return route.fulfill({status:503,json:{error:'Rasm yuklanmadi'}});
         if (url.pathname.endsWith('/wedding-image')) return route.fulfill({ contentType: 'image/png', body: image });
-        if (url.pathname.startsWith('/api/')) return route.fulfill({ contentType: 'application/json', json: { id: 1, type: 'wedding', design: 'wedding_classic', status: 'ready', preview: false } });
+        if (url.pathname.startsWith('/api/')) return route.fulfill({ contentType: 'application/json', json: { id: 1, type: 'wedding', design: 'wedding_classic', status: 'ready', preview: false, details:{groom:'Farrux',bride:'Nasiba',date:'12.11.2027',time:'17:00',address:'Qamashi tumani, Shirinabonu to‘yxonasi'} } });
         const file = url.pathname === '/' ? 'index.html' : path.basename(url.pathname);
         return route.fulfill({ contentType: file.endsWith('.js') ? 'application/javascript' : file.endsWith('.css') ? 'text/css' : 'text/html', body: await fs.readFile(path.join(root,'web_minimal',file)) });
       });
       await page.goto('http://qadam.test/?invite=1');
+      await page.getByText('Qamashi tumani, Shirinabonu to‘yxonasi',{exact:true}).waitFor();
+      await page.getByRole('button',{name:'Qayta yuklash'}).click();
       await page.locator('img[alt="To‘y taklifnomasi"]').waitFor();
       await page.waitForFunction(() => document.querySelector('img').naturalWidth > 0);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);

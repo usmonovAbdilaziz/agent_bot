@@ -193,3 +193,8 @@ main:has(.invitation) { max-width: none; padding: 0; }
 .design-meeting .arena button { border-radius: 999px; }
 .design-meeting .no { background: #eee5dd; }
 .design-meeting .preview-note { position: relative; }
+
+.wedding-details { text-align:left; margin:16px 0; }
+.wedding-details > div { display:grid; grid-template-columns:5em minmax(0,1fr); gap:10px; padding:8px 0; }
+.wedding-details dt { font-weight:600; }
+.wedding-details dd { margin:0; overflow-wrap:anywhere; user-select:text; -webkit-user-select:text; }

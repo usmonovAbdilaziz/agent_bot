@@ -18,16 +18,21 @@ const root=path.resolve(__dirname,'..');
     }
    },{blocked});
    await context.route('https://telegram.org/**',r=>r.fulfill({body:''}));
+   let audioRequests=0;
    await context.route('http://music.test/**',async r=>{
     const url=new URL(r.request().url());
     if(url.pathname.startsWith('/api/'))return r.fulfill({json:{id:1,type:'fun',design:'meeting',title:'Malika',description:'Bir piyola choy?',status:'ready',media_kind:'none',details:{meeting_recipient:'Malika',meeting_sender:'Javohir',meeting_slots:[]}}});
+    if(url.pathname.endsWith('.mp3')) audioRequests++;
     const file=url.pathname==='/'?'index.html':path.basename(url.pathname);
     return r.fulfill({contentType:file.endsWith('.mp3')?'audio/mpeg':file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html',body:await fs.readFile(path.join(root,'web_minimal',file))});
    });
    console.log('Scenario',blocked);
    await page.goto('http://music.test/?invite=1');
    await page.getByRole('slider').waitFor();
-   if(blocked){assert.equal(await page.locator('audio').evaluate(a=>a.paused),true);await page.getByRole('button',{name:'Musiqani yoqish',exact:true}).click();}
+   await page.getByRole('slider').press('ArrowRight');
+   assert.equal(await page.locator('audio').getAttribute('src'),null);
+   assert.equal(audioRequests,0);
+   await page.getByRole('button',{name:'Musiqani yoqish',exact:true}).click();
    await page.waitForFunction(()=>{const a=document.querySelector('audio');return !a.paused&&a.currentTime>0.1&&a.readyState>=2});
    console.log('Audio started');
    const duration=await page.locator('audio').evaluate(a=>a.duration);assert.ok(duration>30,'Real supplied MP3 decoded');
@@ -52,7 +57,7 @@ const root=path.resolve(__dirname,'..');
    await page.evaluate(()=>window.dispatchEvent(new Event('pageshow')));
    await page.waitForFunction(()=>!document.querySelector('audio').paused);
    assert.deepEqual(errors,[]);
-   console.log(`${blocked?'Blocked autoplay fallback':'Automatic audio'}: real MP3, fade, continuous phases, sticker pop, mute persistence, close/resume PASS`);
+   console.log(`${blocked?'Blocked autoplay fallback':'Explicit music activation'}: real MP3, fade, continuous phases, sticker pop, mute persistence, close/resume PASS`);
    await context.close();
   }
  }finally{await browser.close()}

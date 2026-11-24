@@ -239,9 +239,14 @@ class App:
                  f'Jami foydalanuvchilar: <b>{totals["users"]}</b>',
                  f'Taklifnoma yaratganlar: <b>{totals["creators"]}</b>',
                  f'Tayyor taklifnomalar: <b>{totals["invites"]}</b>', '',
-                 '<b>Kunlik hisobot · O‘zbekiston vaqti</b>',
-                 'Sana · Faol odamlar / Yaratuvchilar / Taklifnomalar']
-        for offset in range(7):
+                 f'<b>Bugun · {today:%d.%m} · O‘zbekiston vaqti</b>']
+        current = published.get(today.isoformat())
+        lines.extend([f'Faol — {activity.get(today.isoformat(), 0)} kishi',
+                      f'Yaratuvchi — {current["creators"] if current else 0} kishi',
+                      f'Tayyor taklif — {current["invites"] if current else 0} ta'])
+        if since[:10] < today.isoformat():
+            lines.extend(['', '<b>Oldingi kunlar</b>', 'Sana · Faol / Yaratuvchi / Taklif'])
+        for offset in range(1, 7):
             day = today - timedelta(days=offset)
             key = day.isoformat()
             if key < since[:10]:
@@ -822,7 +827,7 @@ class App:
                 rows.append([('Orqaga','q:home')])
                 return await self.send(uid,'<b>Taklif turini tanlang:</b>',reply_markup=kb(*rows))
             if action=='ceremony':
-                return await self.send(uid,'<b>Marosim turini tanlang:</b>',reply_markup=kb([('💍 To‘y','q:wedding')],[('🎂 Banket','q:banquet')],[('Orqaga','q:choose')]))
+                return await self.send(uid,'<b>Marosim turini tanlang:</b>',reply_markup=kb([('💍 To‘y','q:wedding')],[('Orqaga','q:choose')]))
             if action=='banquet':
                 return await self.send(uid,'Banket, jumladan tug‘ilgan kun taklifnomalari, keyingi bosqichda qo‘shiladi.',reply_markup=kb([('Orqaga','q:ceremony')]))
             mid = flow['invite_id'] if flow else await self.db.begin(uid,'wedding' if action=='wedding' else 'fun')

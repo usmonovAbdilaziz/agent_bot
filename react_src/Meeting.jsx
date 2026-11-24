@@ -189,7 +189,7 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
     let saved;
     try { saved = JSON.parse(localStorage.getItem(key)); } catch { /* optional storage */ }
     return {
-      phase: phases.includes(saved?.phase) ? saved.phase : 'intro',
+      phase: friendly && saved?.phase === 'celebrate' ? 'when' : phases.includes(saved?.phase) ? saved.phase : 'intro',
       when: typeof saved?.when === 'string' && saved.when.length < 40 ? saved.when : '',
       customDate: typeof saved?.customDate === 'string' ? saved.customDate.slice(0, 10) : '',
       customTime: typeof saved?.customTime === 'string' ? saved.customTime.slice(0, 5) : '',
@@ -285,17 +285,9 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
       </> : <p>Bu avvalgi taklifda kun va reja qayd etilmagan.</p>}
     </> : draft.phase === 'intro' ? <>
       {friendly ? <>
-        <div className="friendship-art" aria-hidden="true">
-          <span className="friendship-orbit orbit-one" /><span className="friendship-orbit orbit-two" />
-          <div className="friendship-bubble bubble-blue"><Icon kind="coffee" /><span>Bir piyola suhbat?</span></div>
-          <div className="friendship-bubble bubble-white"><Icon kind="friends" /><span>Albatta, do‘stim!</span></div>
-          <span className="friendship-spark">✦</span>
-        </div>
-        <p className="friendship-eyebrow">YAXSHI DAVRA. YAXSHI KAYFIYAT.</p>
         {title(<>{recipient},<br />bir ko‘rishaylik!</>)}
-        <p className="description">Biroz suhbat, ko‘p kulgi va birga o‘tadigan ajoyib vaqt. Siz uchun do‘stona taklif bor.</p>
+        <p className="description">{sender ? <><strong>{sender}</strong> sizni do‘stona uchrashuvga taklif qilyapti.</> : 'Sizga do‘stona uchrashuv taklifi bor.'}</p>
         <FriendshipSlider onOpen={() => phase('question')} />
-        <div className="friendship-tags"><span><Icon kind="coffee" /> Suhbat</span><span><Icon kind="game" /> O‘yin</span><span><Icon kind="spark" /> Kayfiyat</span></div>
       </> : <>
       {title(recipient)}
       <div className="meeting-seal"><JoinedHeart progress={progress} /></div>
@@ -309,14 +301,14 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
           }} />
       </div>
       </>}
-      {sender && <p className="meeting-from">Kimdan: {sender}</p>}
+      {!friendly && sender && <p className="meeting-from">Kimdan: {sender}</p>}
     </> : draft.phase === 'question' ? <>
       <article className="meeting-question-paper">
         <p>{friendly ? "Telefonni bir chetga qo‘yib, yuzma-yuz gaplashadigan vaqt keldi." : "Sizga munosabatim bor — balki umrning eng yaxshi xotiralaridan biri shunday boshlanar."}</p>
         {renderMedia?.(invite)}
         {title(<>{recipient},<br />uchrashamizmi?</>)}
         <p className="description">{invite.description}</p>
-        {friendly ? <FriendChoice onYes={() => phase('celebrate')} onNo={no} /> : <Choice onYes={() => { react('yes'); phase('celebrate'); }} onNo={no} attempts={draft.attempts} />}
+        {friendly ? <FriendChoice onYes={() => phase('when')} onNo={no} /> : <Choice onYes={() => { react('yes'); phase('celebrate'); }} onNo={no} attempts={draft.attempts} />}
       </article>
     </> : draft.phase === 'celebrate' ? <>
       <div className="meeting-celebrate-heart"><Icon kind={friendly ? "friends" : "heart"} /></div>
@@ -331,7 +323,7 @@ export default function Meeting({ invite, api, onStatus, renderMedia }) {
       const initial = Number.isFinite(minute) ? hour*60+minute : 12*60;
       patch({ phase: 'clock', choice: 'custom', customTime: clockValue(Math.min(high, Math.max(low, initial))) });
     }}>
-      <div className="meeting-form-top"><button type="button" onClick={() => phase('celebrate')}>Orqaga</button><span>1 / 3</span></div>
+      <div className="meeting-form-top"><button type="button" onClick={() => phase('question')}>Orqaga</button><span>1 / 3</span></div>
       {title('Sanani tanlang')}
       {slots.map(slot => <button type="button" className="meeting-time-option" key={slot} onClick={() => {
         const local = new Date(Date.parse(slot)+5*3600000).toISOString();

@@ -129,8 +129,9 @@ const out=path.join(root,friendly?'output/friendship':'output/meeting');
    const yesButton=page.getByRole('button',{name:'Ha',exact:true});
    if(name==='desktop') await yesButton.click();
    else { await yesButton.focus(); await yesButton.press('Enter'); }
-   await page.getByRole('heading',{name:'Ajoyib, uchrashamiz!'}).waitFor();assert.equal(posts.length,0);await shot('celebrate');
-   await page.getByRole('button',{name:'Rejani tanlash'}).click();
+   if(!friendly) { await page.getByRole('heading',{name:'Ajoyib, uchrashamiz!'}).waitFor();await shot('celebrate'); }
+   assert.equal(posts.length,0);
+   if(!friendly) await page.getByRole('button',{name:'Rejani tanlash'}).click();
    await page.getByRole('heading',{name:friendly?'Sanani tanlang':'Kun va vaqtni tanlang'}).waitFor();
    assert.equal(await page.getByRole('button',{name:friendly?'Keyingi — vaqtni tanlash':'Keyingi — rejani tanlash'}).isDisabled(),true);
    if(name!=='small' && !friendly) {
@@ -223,7 +224,7 @@ const out=path.join(root,friendly?'output/friendship':'output/meeting');
    // Sender can rehearse the full flow; final confirmation cannot write.
    preview=true;saved=null;await page.evaluate(()=>localStorage.clear());await page.reload();
    await openInvite();await page.getByRole('button',{name:'Ha',exact:true}).click();
-   await page.getByRole('button',{name:'Rejani tanlash'}).click();
+   if(!friendly) await page.getByRole('button',{name:'Rejani tanlash'}).click();
    if(name==='small') {
     for(let i=0;i<monthDelta;i++)await page.getByRole('button',{name:'Keyingi oy',exact:true}).click();
     await page.locator(`[data-day="${day}"]`).click();

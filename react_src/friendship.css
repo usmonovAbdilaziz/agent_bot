@@ -113,3 +113,5 @@ main:has(.meeting-flow.meeting-friendly) { max-width: 560px; padding: max(24px, 
 }
 .meeting-friendly .friend-choice .friend-yes { top:50%; left:50%; width:60%; min-height:48px; padding:8px; border-radius:999px; }
 .friend-choice .friend-caption { width:min(46%,120px); min-height:40px; padding:5px 8px; border:1px solid #d3dae2; border-radius:18px; background:#edf0f4; color:#32425a; font-size:12px; line-height:1.2; cursor:pointer; }
+
+.meeting-flow.meeting-friendly.meeting-intro { min-height: auto; }

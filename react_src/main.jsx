@@ -238,21 +238,30 @@ function Success({ celebrate, effect }) {
 
 function WeddingInvitation({ invite, onStatus }) {
   const [image, setImage] = useState('');
+  const [failed, setFailed] = useState(false);
+  const details = invite.details || {};
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
     let url;
+    setFailed(false);
+    setImage('');
     onStatus('Taklifnoma yuklanmoqda…');
     api(`/invites/${invite.id}/wedding-image`, { blob: true }).then(blob => {
       if (cancelled) return;
       url = URL.createObjectURL(blob);
       setImage(url);
       onStatus('');
-    }).catch(error => { if (!cancelled) onStatus(messageFor(error), true); });
+    }).catch(error => { if (!cancelled) { setFailed(true); onStatus(messageFor(error), true); } });
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
   }, [invite.id, onStatus, attempt]);
   return <section className="wedding-invitation">
-    {image ? <img src={image} alt="To‘y taklifnomasi" /> : <button type="button" className="retry" onClick={() => setAttempt(value => value + 1)}>Qayta yuklash</button>}
+    {image ? <img src={image} alt="To‘y taklifnomasi" /> : failed && <button type="button" className="retry" onClick={() => setAttempt(value => value + 1)}>Qayta yuklash</button>}
+    <dl className="wedding-details">
+      {[[ 'Juftlik', [details.groom, details.bride].filter(Boolean).join(' va ') ],
+        ['Sana', details.date], ['Vaqt', details.time], ['Manzil', details.address]].map(([label,value]) =>
+        value && <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+    </dl>
     {invite.preview && <p>Oluvchiga shunday ko‘rinadi. Tasdiqlash uchun botga qayting.</p>}
   </section>;
 }
