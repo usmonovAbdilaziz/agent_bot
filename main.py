@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.exceptions import TelegramAPIError, TelegramForbiddenError, TelegramRetryAfter
-from aiogram.types import (BotCommand, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup,
+from aiogram.types import (CopyTextButton, LinkPreviewOptions, BotCommand, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup,
     KeyboardButton, Message, ReplyKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo, MenuButtonCommands, BufferedInputFile)
 from designs import DESIGNS, valid_design
 from config import Config
@@ -524,17 +524,21 @@ class App:
         return await self.send(uid,'Qoralama bekor qilindi.',reply_markup=kb([('Yangi taklif','q:new')]))
 
     async def show_link(self, uid, item):
-        link=f'https://t.me/{self.username}?start=i_{item["token"]}'
-        rows=[]
-        if item['type']=='wedding':
-            rows.append([InlineKeyboardButton(text='Telegram orqali ulashish',url='https://t.me/share/url?'+urlencode({'url':link}))])
-            text='Havolani barcha mehmonlarga yuboring.'
-        elif item['share_mode']=='open':
-            rows.append([InlineKeyboardButton(text='Telegram orqali ulashish',url='https://t.me/share/url?'+urlencode({'url':link}))])
-            text='Havolani ko‘p mehmonga yuborishingiz mumkin. /guests orqali javoblarni ko‘ring.'
-        else: text='Havolani bitta oluvchiga yuboring.'
-        rows.append([InlineKeyboardButton(text='Yangi taklif',callback_data='q:home' if uid==await self.admin() else 'q:new')])
-        return await self.send(uid,f'<b>Taklif havolasi tayyor</b>\n{link}\n\n{text}',reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+        link = f'https://t.me/{self.username}?start=i_{item["token"]}'
+        if item['type'] == 'wedding':
+            instruction = 'Havolani barcha mehmonlarga yuboring.'
+        elif item['share_mode'] == 'open':
+            instruction = 'Havolani mehmonlarga yuboring. Javoblarni /guests orqali ko‘ring.'
+        else:
+            instruction = 'Havolani bitta oluvchiga yuboring.'
+        new_action = 'q:home' if uid == await self.admin() else 'q:new'
+        buttons = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text='Ulashish', url='https://t.me/share/url?' + urlencode({'url': link})),
+             InlineKeyboardButton(text='Nusxalash', copy_text=CopyTextButton(text=link))],
+            [InlineKeyboardButton(text='Yangi taklif', callback_data=new_action)],
+        ])
+        return await self.send(uid, f'<b><a href="{esc(link)}">Taklifnoma tayyor</a></b>\n{instruction}',
+                               reply_markup=buttons, link_preview_options=LinkPreviewOptions(is_disabled=True))
 
     async def guests(self, uid, mid=None, page=0):
         if mid is None:
