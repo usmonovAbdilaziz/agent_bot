@@ -92,7 +92,8 @@ async def test_admin_has_two_choices_and_only_admin_assigns(n):
     assert [b['text'] for row in menu for b in row]==['Taklif yaratish','Mening takliflarim','Yordam','Admin']
     await n.cb(1,'q:admin')
     admin_menu=json.loads(n.sent(1)[-1]['reply_markup'])['inline_keyboard']
-    assert len([b for row in admin_menu for b in row]) <= 5
+    assert [b['callback_data'] for row in admin_menu for b in row] == [
+        'q:choose','q:phone','q:requests','q:ideas','q:settings','q:home']
     await n.msg(2,'/start'); await n.cb(2,'q:self'); await n.cb(2,'q:phone')
     assert not await n.db.all('SELECT * FROM q_invites')
     assert not await n.db.flow(2)
