@@ -114,10 +114,15 @@ const out=path.join(root,friendly?'output/friendship':'output/meeting');
    } else {
     const first=await no.innerText();
     const initial=await no.boundingBox();
+    await page.mouse.move(initial.x+initial.width/2,initial.y+initial.height/2);
+    await page.waitForTimeout(3100);
+    assert.equal(await no.innerText(),first);
+    assert.deepEqual(await no.boundingBox(),initial);
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('qadam:meeting:2:1:reply')).attempts),0);
+    if(name==='desktop') await no.click(); else await no.tap();
     await page.waitForFunction(first=>document.querySelector('.friend-caption').textContent!==first,first);
     assert.notDeepEqual(await no.boundingBox(),initial);
-    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('qadam:meeting:2:1:reply')).attempts),0);
-    for(let i=0;i<10;i++) await no.press('Enter');
+    for(let i=1;i<10;i++) await no.press('Enter');
     await noOverflow(); await shot('question-active');
    }
    assert.equal(posts.length,0);

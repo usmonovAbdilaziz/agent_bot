@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 
 const captions = ['Voy, sirpanib ketdim 🫣', 'Hali ushlamadingiz 😜', 'Bu tugma sportchi 🏃',
   'Choyga ham yo‘qmi? ☕', 'Bir piyola gaplashamiz? 😌', 'Kalendar ham kutyapti 📅'];
@@ -11,12 +11,6 @@ function advance(previous) {
 
 export default function FriendChoice({onYes, onNo}) {
   const [bubble, setBubble] = useState(() => ({anchor: randomAnchor(), turn: 0}));
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (!document.hidden) setBubble(advance);
-    }, 2800);
-    return () => clearInterval(timer);
-  }, [bubble.turn]);
   const [x,y] = anchors[bubble.anchor];
   return <div className="friend-choice">
     <svg className="friend-thread" aria-hidden="true"><line x1="50%" y1="50%" x2={x+'%'} y2={y+'%'} /></svg>
